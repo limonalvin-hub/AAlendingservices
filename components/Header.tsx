@@ -32,20 +32,20 @@ const Header: React.FC<HeaderProps> = ({ onShowHowItWorks, onShowApplicationForm
           <button onClick={() => onShowMainAndScroll('faq')} className="text-gray-600 hover:text-brand-blue transition">FAQ</button>
           <button onClick={onShowApplicationForm} className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-2 px-4 rounded-full transition duration-300">Apply Now</button>
         </nav>
-        <button className="md:hidden" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Open navigation menu">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-brand-blue-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <button className="md:hidden p-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} aria-label="Open navigation menu">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-brand-blue-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-4 6h4" />
           </svg>
         </button>
       </div>
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-white shadow-lg absolute top-full left-0 w-full">
-          <nav className="flex flex-col items-center space-y-4 py-4">
-            <button onClick={() => handleMobileLinkClick(onShowHowItWorks)} className="text-gray-600 hover:text-brand-blue transition">How It Works</button>
-            <button onClick={() => handleMobileLinkClick(onShowApplicationForm)} className="text-gray-600 hover:text-brand-blue transition">Application Form</button>
-            <button onClick={() => handleMobileScrollClick('apply')} className="text-gray-600 hover:text-brand-blue transition">Requirements</button>
-            <button onClick={() => handleMobileScrollClick('faq')} className="text-gray-600 hover:text-brand-blue transition">FAQ</button>
-            <button onClick={() => handleMobileLinkClick(onShowApplicationForm)} className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-2 px-6 rounded-full transition duration-300 w-auto">Apply Now</button>
+        <div className="md:hidden bg-white shadow-lg absolute top-full left-0 w-full border-t border-gray-100">
+          <nav className="flex flex-col items-center space-y-2 py-6 px-4">
+            <button onClick={() => handleMobileLinkClick(onShowHowItWorks)} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">How It Works</button>
+            <button onClick={() => handleMobileLinkClick(onShowApplicationForm)} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">Application Form</button>
+            <button onClick={() => handleMobileScrollClick('apply')} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">Requirements</button>
+            <button onClick={() => handleMobileScrollClick('faq')} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">FAQ</button>
+            <button onClick={() => handleMobileLinkClick(onShowApplicationForm)} className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-3 px-8 rounded-full transition duration-300 w-full mt-4 text-lg">Apply Now</button>
           </nav>
         </div>
       )}
