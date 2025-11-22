@@ -1,0 +1,281 @@
+import React, { useState, FormEvent } from 'react';
+
+interface LoanApplicationFormProps {
+  onBack: () => void;
+}
+
+const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => {
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({
+    name: '',
+    schoolId: '',
+    course: '',
+    address: '',
+    phone: '',
+    email: '',
+    loanPurpose: '',
+    loanAmount: '',
+    disbursementMethod: '',
+    walletNumber: '',
+    corFile: null as File | null,
+    schoolIdFile: null as File | null,
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({ ...prevState, [name]: value }));
+  };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, files } = e.target;
+    if (files && files.length > 0) {
+      setFormData(prevState => ({ ...prevState, [name]: files[0] }));
+    }
+  };
+
+  const nextStep = () => setStep(prev => prev + 1);
+  const prevStep = () => setStep(prev => prev - 1);
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    // Since a frontend application cannot send emails directly,
+    // we use a mailto link to open the user's default email client.
+    const recipient = 'aalendingservices@gmail.com';
+    const subject = `New Loan Application: ${formData.name}`;
+    
+    let disbursementDetails = '';
+    if (formData.disbursementMethod === 'gcash') {
+      disbursementDetails = `Method: GCash\nE-Wallet Number: ${formData.walletNumber}`;
+    } else if (formData.disbursementMethod === 'maya') {
+      disbursementDetails = `Method: Maya\nE-Wallet Number: ${formData.walletNumber}`;
+    } else {
+      disbursementDetails = `Method: Claim In Person`;
+    }
+
+    const body = `
+A new loan application has been submitted with the following details:
+
+--- Personal Information ---
+Full Name: ${formData.name}
+School ID Number: ${formData.schoolId}
+College Course: ${formData.course}
+Address: ${formData.address}
+Phone Number: ${formData.phone}
+Email Address: ${formData.email}
+
+--- Loan Details ---
+Loan Amount Requested: ₱${formData.loanAmount}
+Purpose of Loan: ${formData.loanPurpose}
+
+--- Receiving Options ---
+${disbursementDetails}
+
+---
+IMPORTANT: Please attach the required files before sending:
+1. Certificate of Registration (COR)
+2. School ID (Front & Back)
+    `;
+
+    // Encode the subject and body for the URL
+    const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // Open the user's email client
+    window.location.href = mailtoLink;
+
+    setIsSubmitted(true);
+  };
+
+  const handleNewApplication = () => {
+    setIsSubmitted(false);
+    setStep(1);
+    // Also reset form data for the new application
+    setFormData({
+      name: '',
+      schoolId: '',
+      course: '',
+      address: '',
+      phone: '',
+      email: '',
+      loanPurpose: '',
+      loanAmount: '',
+      disbursementMethod: '',
+      walletNumber: '',
+      corFile: null as File | null,
+      schoolIdFile: null as File | null,
+    });
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-10 flex items-center">
+      <div className="container mx-auto px-6">
+        <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+          {isSubmitted ? (
+            <div className="text-center">
+              <svg className="w-16 h-16 mx-auto mb-4 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done! Please Send Your Application</h3>
+              <p className="text-gray-600 mb-6">We've opened your default email client with your application details pre-filled. Please review the information, attach your documents, and then click 'Send' to complete your application.</p>
+              <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md" role="alert">
+                  <p className="font-bold">Important:</p>
+                  <p>Don't forget to attach your Certificate of Registration (COR) and School ID picture before sending the email.</p>
+              </div>
+              <div className="flex justify-center gap-4 mt-8">
+                <button
+                  onClick={handleNewApplication}
+                  className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-2 px-6 rounded-lg transition duration-300"
+                >
+                  New Application
+                </button>
+                 <button
+                  onClick={onBack}
+                  className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-300"
+                >
+                  Back to Home
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="text-center mb-8">
+                <h2 className="text-3xl md:text-4xl font-bold text-brand-blue-dark">Loan Application Form</h2>
+                <p className="text-gray-600 mt-2">Step {step} of 2: {step === 1 ? 'Personal Information' : 'Loan Details & Documents'}</p>
+              </div>
+              <form onSubmit={handleSubmit}>
+                {step === 1 && (
+                  <div>
+                    <div className="space-y-4">
+                      {/* Personal Info Fields */}
+                      <div>
+                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
+                        <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" />
+                      </div>
+                      <div>
+                        <label htmlFor="schoolId" className="block text-sm font-medium text-gray-700">School ID Number</label>
+                        <input type="text" name="schoolId" id="schoolId" value={formData.schoolId} onChange={handleChange} required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" />
+                      </div>
+                      <div>
+                        <label htmlFor="course" className="block text-sm font-medium text-gray-700">College Course</label>
+                        <input type="text" name="course" id="course" value={formData.course} onChange={handleChange} required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" placeholder="e.g., Bachelor of Science in Information Technology"/>
+                      </div>
+                      <div>
+                        <label htmlFor="address" className="block text-sm font-medium text-gray-700">Address</label>
+                        <input type="text" name="address" id="address" value={formData.address} onChange={handleChange} required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" />
+                      </div>
+                      <div>
+                        <label htmlFor="phone" className="block text-sm font-medium text-gray-700">Phone Number</label>
+                        <input type="tel" name="phone" id="phone" value={formData.phone} onChange={handleChange} required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" />
+                      </div>
+                      <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
+                        <input type="email" name="email" id="email" value={formData.email} onChange={handleChange} required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" />
+                      </div>
+                    </div>
+                    <div className="mt-8 flex justify-end items-center gap-4">
+                      <button type="button" onClick={onBack} className="text-gray-600 hover:text-brand-blue transition font-medium py-2 px-4">Back to Home</button>
+                      <button type="button" onClick={nextStep} className="bg-brand-blue hover:bg-brand-blue-dark text-white font-bold py-2 px-6 rounded-lg transition duration-300">Next</button>
+                    </div>
+                  </div>
+                )}
+
+                {step === 2 && (
+                  <div>
+                    <div className="space-y-4">
+                       {/* Loan Details & Documents */}
+                      <div>
+                        <label htmlFor="loanAmount" className="block text-sm font-medium text-gray-700">Loan Amount (₱)</label>
+                        <input type="number" name="loanAmount" id="loanAmount" value={formData.loanAmount} onChange={handleChange} placeholder="e.g., 500" required className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" />
+                      </div>
+                       <div>
+                        <label htmlFor="loanPurpose" className="block text-sm font-medium text-gray-700">Purpose of Loan</label>
+                        <textarea name="loanPurpose" id="loanPurpose" value={formData.loanPurpose} onChange={handleChange} required rows={3} className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-gray-50" placeholder="e.g., For thesis project materials..."></textarea>
+                      </div>
+                      
+                      {/* Disbursement Options */}
+                      <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                        <label className="block text-base font-medium text-gray-700 mb-2">Preferred Method of Receiving Funds</label>
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <input 
+                              id="gcash" 
+                              name="disbursementMethod" 
+                              type="radio" 
+                              value="gcash" 
+                              checked={formData.disbursementMethod === 'gcash'} 
+                              onChange={handleChange} 
+                              required
+                              className="focus:ring-brand-blue h-4 w-4 text-brand-blue border-gray-300" 
+                            />
+                            <label htmlFor="gcash" className="ml-3 block text-sm font-medium text-gray-700">GCash</label>
+                          </div>
+                          <div className="flex items-center">
+                            <input 
+                              id="maya" 
+                              name="disbursementMethod" 
+                              type="radio" 
+                              value="maya" 
+                              checked={formData.disbursementMethod === 'maya'} 
+                              onChange={handleChange} 
+                              className="focus:ring-brand-blue h-4 w-4 text-brand-blue border-gray-300" 
+                            />
+                            <label htmlFor="maya" className="ml-3 block text-sm font-medium text-gray-700">Maya</label>
+                          </div>
+                          <div className="flex items-center">
+                            <input 
+                              id="in_person" 
+                              name="disbursementMethod" 
+                              type="radio" 
+                              value="in_person" 
+                              checked={formData.disbursementMethod === 'in_person'} 
+                              onChange={handleChange} 
+                              className="focus:ring-brand-blue h-4 w-4 text-brand-blue border-gray-300" 
+                            />
+                            <label htmlFor="in_person" className="ml-3 block text-sm font-medium text-gray-700">Claim In Person</label>
+                          </div>
+                        </div>
+
+                        {(formData.disbursementMethod === 'gcash' || formData.disbursementMethod === 'maya') && (
+                          <div className="mt-4 animate-fade-in">
+                            <label htmlFor="walletNumber" className="block text-sm font-medium text-gray-700">
+                              {formData.disbursementMethod === 'gcash' ? 'GCash' : 'Maya'} Number
+                            </label>
+                            <input 
+                              type="text" 
+                              name="walletNumber" 
+                              id="walletNumber" 
+                              value={formData.walletNumber} 
+                              onChange={handleChange} 
+                              required 
+                              className="mt-1 block w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-brand-blue focus:border-brand-blue bg-white" 
+                              placeholder="09XXXXXXXXX" 
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label htmlFor="corFile" className="block text-sm font-medium text-gray-700">Upload Certificate of Registration (COR)</label>
+                        <input type="file" name="corFile" id="corFile" onChange={handleFileChange} required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-brand-green hover:file:bg-green-100"/>
+                        {formData.corFile && <span className="text-xs text-gray-500 mt-1">Selected: {formData.corFile.name}</span>}
+                      </div>
+                      <div>
+                        <label htmlFor="schoolIdFile" className="block text-sm font-medium text-gray-700">Upload School ID (Front & Back)</label>
+                        <input type="file" name="schoolIdFile" id="schoolIdFile" onChange={handleFileChange} required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-brand-green hover:file:bg-green-100"/>
+                        {formData.schoolIdFile && <span className="text-xs text-gray-500 mt-1">Selected: {formData.schoolIdFile.name}</span>}
+                      </div>
+                    </div>
+                    <div className="mt-8 flex justify-between items-center gap-4">
+                      <button type="button" onClick={prevStep} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg transition duration-300">Back</button>
+                      <button type="submit" className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-2 px-6 rounded-lg transition duration-300">Submit Application</button>
+                    </div>
+                  </div>
+                )}
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default LoanApplicationForm;
