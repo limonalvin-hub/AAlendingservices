@@ -138,10 +138,35 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       return;
     }
 
-    // Since a frontend application cannot send emails directly,
-    // we use a mailto link to open the user's default email client.
+    // --- SIMULATE BACKEND SUBMISSION (For Admin Panel Demo) ---
+    // We save the application to localStorage so the Admin Panel can read it.
+    // In a real app, this would be an API call to a server.
+    
+    const newApplication = {
+      id: Date.now().toString(), // simple unique ID
+      date: new Date().toISOString(),
+      status: 'Pending',
+      ...formData,
+      // We can't save File objects to localStorage easily, so we just save names for demo
+      corFileName: formData.corFile ? formData.corFile.name : 'Not attached',
+      schoolIdFileName: formData.schoolIdFile ? formData.schoolIdFile.name : 'Not attached',
+      // Removing actual file objects from storage payload
+      corFile: undefined,
+      schoolIdFile: undefined
+    };
+
+    try {
+      const existingApps = JSON.parse(localStorage.getItem('loanApplications') || '[]');
+      localStorage.setItem('loanApplications', JSON.stringify([newApplication, ...existingApps]));
+    } catch (err) {
+      console.error("Could not save to local storage", err);
+    }
+
+    // --- EMAIL GENERATION (Existing Logic) ---
+    // We still generate the email as a fallback or primary notification method
+    
     const recipient = 'aalendingservices@gmail.com';
-    const subject = `New Loan Application: ${formData.name}`;
+    const subject = `New Loan Application: ${formData.name} (ID: ${newApplication.id})`;
     
     let disbursementDetails = '';
     if (formData.disbursementMethod === 'gcash') {

@@ -9,14 +9,31 @@ import FAQ from './components/FAQ';
 import Feedback from './components/Feedback';
 import Footer from './components/Footer';
 import TermsAndConditions from './components/TermsAndConditions';
+import AdminPanel from './components/AdminPanel';
 
 function App() {
   const [page, setPage] = useState('main');
 
+  // Check for admin URL parameter to potentially load admin page directly
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('page') === 'admin') {
+      setPage('admin');
+    }
+  }, []);
+
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
   const showApplicationForm = () => setPage('application');
-  const showMain = () => setPage('main');
+  const showMain = () => {
+    setPage('main');
+    // Clean URL param if exists
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('page') === 'admin') {
+      url.searchParams.delete('page');
+      window.history.pushState({}, '', url);
+    }
+  };
 
   const showMainAndScroll = (sectionId: string) => {
     setPage('main');
@@ -28,6 +45,15 @@ function App() {
       }
     }, 100);
   };
+
+  // Hidden trigger for Admin Panel (can be accessed via URL ?page=admin or hidden gesture)
+  const goToAdmin = () => {
+    setPage('admin');
+  };
+
+  if (page === 'admin') {
+    return <AdminPanel onBack={showMain} />;
+  }
 
   if (page === 'terms') {
     return <TermsAndConditions onBack={showMain} />;
@@ -47,6 +73,7 @@ function App() {
         onShowHowItWorks={showHowItWorks}
         onShowApplicationForm={showApplicationForm}
         onShowMainAndScroll={showMainAndScroll}
+        onGoToAdmin={goToAdmin}
       />
       <main>
         <Hero onShowApplicationForm={showApplicationForm} />

@@ -34,11 +34,13 @@ const Footer: React.FC<FooterProps> = ({ onShowTerms, onShowHowItWorks, onShowAp
             </ul>
           </div>
         </div>
-        <div className="mt-8 border-t border-gray-700 pt-6 text-center text-gray-500">
+        <div className="mt-8 border-t border-gray-700 pt-6 flex flex-col md:flex-row justify-between items-center text-gray-500">
           <p>&copy; {new Date().getFullYear()} Allowance Aid. All Rights Reserved.</p>
-          <button onClick={onShowTerms} className="mt-2 text-gray-400 hover:text-white underline transition">
-            Terms and Conditions
-          </button>
+          <div className="flex gap-4 mt-4 md:mt-0">
+            <button onClick={onShowTerms} className="text-gray-400 hover:text-white underline transition text-sm">
+              Terms and Conditions
+            </button>
+          </div>
         </div>
       </div>
     </footer>
