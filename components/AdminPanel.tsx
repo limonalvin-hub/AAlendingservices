@@ -221,7 +221,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loan Info</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Control Actions</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -259,16 +259,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex flex-col space-y-2">
+                                            {/* Status Controls */}
                                             {app.status === 'Pending' && (
-                                                <>
-                                                    <button onClick={() => updateStatus(app.id, 'Approved')} className="text-green-600 hover:text-green-900 text-left">Approve</button>
-                                                    <button onClick={() => updateStatus(app.id, 'Rejected')} className="text-red-600 hover:text-red-900 text-left">Reject</button>
-                                                </>
+                                                <div className="flex space-x-2">
+                                                    <button 
+                                                        onClick={() => updateStatus(app.id, 'Approved')} 
+                                                        className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs flex-1 transition shadow-sm"
+                                                        title="Approve Application"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => updateStatus(app.id, 'Rejected')} 
+                                                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs flex-1 transition shadow-sm"
+                                                        title="Reject Application"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                </div>
                                             )}
+                                            
                                             {app.status === 'Approved' && (
-                                                <button onClick={() => updateStatus(app.id, 'Paid')} className="text-blue-600 hover:text-blue-900 text-left">Mark Paid</button>
+                                                <div className="flex space-x-2">
+                                                    <button 
+                                                        onClick={() => updateStatus(app.id, 'Paid')} 
+                                                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs flex-1 transition shadow-sm"
+                                                    >
+                                                        Mark Paid
+                                                    </button>
+                                                     <button 
+                                                        onClick={() => updateStatus(app.id, 'Rejected')} 
+                                                        className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded text-xs transition border border-red-200"
+                                                        title="Revoke Approval"
+                                                    >
+                                                        Revoke
+                                                    </button>
+                                                </div>
                                             )}
-                                            <button onClick={() => deleteApplication(app.id)} className="text-gray-400 hover:text-gray-600 text-left">Delete</button>
+
+                                            {app.status === 'Rejected' && (
+                                                <div className="flex space-x-2">
+                                                     <button 
+                                                        onClick={() => updateStatus(app.id, 'Approved')} 
+                                                        className="bg-green-100 text-green-600 hover:bg-green-200 px-3 py-1 rounded text-xs flex-1 transition border border-green-200"
+                                                    >
+                                                        Reconsider
+                                                    </button>
+                                                </div>
+                                            )}
+                                            
+                                            {app.status === 'Paid' && (
+                                                <span className="text-gray-400 text-xs italic text-center">Transaction Complete</span>
+                                            )}
+
+                                            <button 
+                                                onClick={() => deleteApplication(app.id)} 
+                                                className="text-gray-400 hover:text-red-500 text-xs text-center mt-2 underline"
+                                            >
+                                                Delete Record
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
