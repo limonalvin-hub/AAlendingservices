@@ -1,4 +1,5 @@
-import React, { useState, FormEvent } from 'react';
+
+import React, { useState, FormEvent, useRef } from 'react';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -21,7 +22,82 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     walletNumber: '',
     corFile: null as File | null,
     schoolIdFile: null as File | null,
+    signature: '',
   });
+
+  // Signature Canvas Logic
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  const getCanvasCoordinates = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Prevent scrolling when touching the canvas
+    if ('touches' in e) {
+       // Handled by CSS touch-action: none, but good practice to be aware
+    }
+
+    setIsDrawing(true);
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#000';
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { x, y } = getCanvasCoordinates(e, canvas);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    if (canvasRef.current) {
+      setFormData(prev => ({ ...prev, signature: canvasRef.current?.toDataURL() || '' }));
+      if (errors.signature) {
+        setErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors.signature;
+            return newErrors;
+        });
+      }
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx?.clearRect(0, 0, canvas.width, canvas.height);
+      setFormData(prev => ({ ...prev, signature: '' }));
+    }
+  };
 
   const validatePhone = (phone: string) => {
     // PH mobile number format: starts with 09 and has 11 digits total
@@ -132,6 +208,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     if (!formData.corFile) stepErrors.corFile = 'Certificate of Registration is required';
     if (!formData.schoolIdFile) stepErrors.schoolIdFile = 'School ID is required';
+    if (!formData.signature) stepErrors.signature = 'Please sign the application';
 
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
@@ -140,7 +217,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     // --- SIMULATE BACKEND SUBMISSION (For Admin Panel Demo) ---
     // We save the application to localStorage so the Admin Panel can read it.
-    // In a real app, this would be an API call to a server.
     
     const newApplication = {
       id: Date.now().toString(), // simple unique ID
@@ -163,7 +239,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     }
 
     // --- EMAIL GENERATION (Existing Logic) ---
-    // We still generate the email as a fallback or primary notification method
     
     const recipient = 'aalendingservices@gmail.com';
     const subject = `New Loan Application: ${formData.name} (ID: ${newApplication.id})`;
@@ -195,6 +270,10 @@ Purpose of Loan: ${formData.loanPurpose}
 --- Receiving Options ---
 ${disbursementDetails}
 
+--- Certification ---
+Signed: Yes (Electronically Signed via App)
+Date: ${new Date().toLocaleDateString()}
+
 ---
 IMPORTANT: Please attach the required files before sending:
 1. Certificate of Registration (COR)
@@ -214,7 +293,6 @@ IMPORTANT: Please attach the required files before sending:
     setIsSubmitted(false);
     setStep(1);
     setErrors({});
-    // Also reset form data for the new application
     setFormData({
       name: '',
       schoolId: '',
@@ -228,6 +306,7 @@ IMPORTANT: Please attach the required files before sending:
       walletNumber: '',
       corFile: null as File | null,
       schoolIdFile: null as File | null,
+      signature: '',
     });
   }
 
@@ -403,6 +482,36 @@ IMPORTANT: Please attach the required files before sending:
                         {formData.schoolIdFile && <span className="text-xs text-gray-500 mt-1">Selected: {formData.schoolIdFile.name}</span>}
                         {errors.schoolIdFile && <p className="text-red-500 text-xs mt-1">{errors.schoolIdFile}</p>}
                       </div>
+
+                      {/* Client Signature Section */}
+                      <div className="border-t border-gray-200 pt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Client Signature</label>
+                        <div className="bg-white border border-gray-300 rounded-md overflow-hidden relative">
+                          <canvas 
+                            ref={canvasRef}
+                            width={600}
+                            height={200}
+                            className="w-full h-48 touch-none bg-white cursor-crosshair"
+                            onMouseDown={startDrawing}
+                            onMouseMove={draw}
+                            onMouseUp={stopDrawing}
+                            onMouseLeave={stopDrawing}
+                            onTouchStart={startDrawing}
+                            onTouchMove={draw}
+                            onTouchEnd={stopDrawing}
+                          />
+                          <button 
+                            type="button" 
+                            onClick={clearSignature}
+                            className="absolute top-2 right-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded border border-gray-300"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Please sign in the box above.</p>
+                        {errors.signature && <p className="text-red-500 text-xs mt-1">{errors.signature}</p>}
+                      </div>
+
                     </div>
                     <div className="mt-8 flex justify-between items-center gap-4">
                       <button type="button" onClick={prevStep} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Back</button>

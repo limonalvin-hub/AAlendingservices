@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 
 interface AdminPanelProps {
@@ -20,6 +21,7 @@ interface LoanApplication {
   walletNumber: string;
   corFileName: string;
   schoolIdFileName: string;
+  signature?: string; // Base64 signature string
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
@@ -340,6 +342,12 @@ Body: (Sent successfully)`);
                                         <div className="text-sm font-medium text-gray-900">{app.name}</div>
                                         <div className="text-sm text-gray-500">{app.schoolId}</div>
                                         <div className="text-xs text-gray-400">{app.course}</div>
+                                        {app.signature && (
+                                            <div className="mt-2">
+                                                <p className="text-xs text-gray-400 mb-1">Signed:</p>
+                                                <img src={app.signature} alt="Client Signature" className="h-8 border border-gray-200 bg-white rounded" />
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="text-sm font-bold text-gray-900">₱{app.loanAmount}</div>
