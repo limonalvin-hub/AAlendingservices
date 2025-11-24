@@ -32,6 +32,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   
   // Settings State
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [maintenanceDuration, setMaintenanceDuration] = useState<number>(60); // Default 60 mins
 
   useEffect(() => {
     // Check if already logged in this session
@@ -81,12 +82,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     
     // Confirmation Dialog
     const confirmMessage = newValue 
-        ? "Are you sure you want to ENABLE Maintenance Mode?\n\nStudents will be locked out immediately.\nAdmin 'Double Click' gesture will be HIDDEN.\n\nAdmins must access via: /?page=admin" 
+        ? `Are you sure you want to ENABLE Maintenance Mode for approx. ${maintenanceDuration} minutes?\n\nStudents will be locked out immediately.\nAdmin 'Double Click' gesture will be HIDDEN.\n\nAdmins must access via: /?page=admin` 
         : "Are you sure you want to DISABLE Maintenance Mode? The application will be live for all users.";
     
     if (window.confirm(confirmMessage)) {
         setMaintenanceMode(newValue);
         localStorage.setItem('maintenance_mode', String(newValue));
+        
+        if (newValue) {
+          // Set End Time
+          const endTime = Date.now() + (maintenanceDuration * 60 * 1000);
+          localStorage.setItem('maintenance_end_time', endTime.toString());
+        } else {
+          // Clear End Time
+          localStorage.removeItem('maintenance_end_time');
+        }
         
         // Force reload to apply strict gatekeeping rules in App.tsx immediately
         window.location.reload();
@@ -297,8 +307,8 @@ Body: (Sent successfully)`);
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         
         {/* System Settings Panel (New) */}
-        <div className="bg-gradient-to-r from-gray-800 to-gray-700 rounded-lg shadow-lg mb-8 p-6 text-white flex flex-col sm:flex-row justify-between items-center">
-            <div>
+        <div className="bg-gradient-to-r from-gray-800 to-gray-700 rounded-lg shadow-lg mb-8 p-6 text-white flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-4 md:mb-0">
                 <h3 className="text-lg font-bold flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -308,22 +318,39 @@ Body: (Sent successfully)`);
                 </h3>
                 <p className="text-gray-300 text-sm mt-1">Manage global application availability.</p>
             </div>
-            <div className="mt-4 sm:mt-0 flex items-center bg-gray-900 rounded-lg p-1">
-                <span className={`px-3 py-1 text-sm font-medium ${maintenanceMode ? 'text-gray-400' : 'text-green-400'}`}>
-                    {maintenanceMode ? 'System Offline' : 'System Online'}
-                </span>
-                <button 
-                    onClick={toggleMaintenanceMode}
-                    className={`ml-3 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${maintenanceMode ? 'bg-yellow-500' : 'bg-gray-600'}`}
-                >
-                    <span className="sr-only">Enable Maintenance Mode</span>
-                    <span 
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} 
+            
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+                {!maintenanceMode && (
+                  <div className="flex items-center gap-2 bg-gray-600 rounded p-1.5">
+                    <label htmlFor="duration" className="text-xs text-gray-300">Duration (mins):</label>
+                    <input 
+                      id="duration"
+                      type="number" 
+                      min="1"
+                      value={maintenanceDuration}
+                      onChange={(e) => setMaintenanceDuration(parseInt(e.target.value) || 0)}
+                      className="w-16 text-black px-2 py-0.5 rounded text-sm focus:outline-none"
                     />
-                </button>
-                <span className="ml-3 text-sm font-bold text-white mr-2">
-                    Maintenance Mode: {maintenanceMode ? 'ON' : 'OFF'}
-                </span>
+                  </div>
+                )}
+                
+                <div className="flex items-center bg-gray-900 rounded-lg p-1">
+                    <span className={`px-3 py-1 text-sm font-medium ${maintenanceMode ? 'text-gray-400' : 'text-green-400'}`}>
+                        {maintenanceMode ? 'System Offline' : 'System Online'}
+                    </span>
+                    <button 
+                        onClick={toggleMaintenanceMode}
+                        className={`ml-3 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${maintenanceMode ? 'bg-yellow-500' : 'bg-gray-600'}`}
+                    >
+                        <span className="sr-only">Enable Maintenance Mode</span>
+                        <span 
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} 
+                        />
+                    </button>
+                    <span className="ml-3 text-sm font-bold text-white mr-2">
+                        Mode: {maintenanceMode ? 'ON' : 'OFF'}
+                    </span>
+                </div>
             </div>
         </div>
 
