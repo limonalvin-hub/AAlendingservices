@@ -3,19 +3,27 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 
 // --- SERVICE WORKER KILL SWITCH ---
-// We aggressively unregister any service workers to prevent stale content caching
-// which is critical for the "Strict Maintenance Mode" feature.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(function(registrations) {
-    for (let registration of registrations) {
-      registration.unregister()
-        .then(function() {
-          console.log('Service Worker unregistered to ensure fresh content.');
-        });
+// We aggressively unregister any service workers to prevent stale content caching.
+// Wrapped in a safe execution block to prevent "invalid state" errors if the document isn't ready.
+const unregisterWorkers = async () => {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+        console.log('Service Worker unregistered to ensure fresh content.');
+      }
+    } catch (error) {
+      console.warn('Service Worker cleanup skipped:', error);
     }
-  }).catch(function(error) {
-    console.error('Error unregistering service worker:', error);
-  });
+  }
+};
+
+// Ensure document is fully loaded before attempting to access SW registrations
+if (document.readyState === 'complete') {
+  unregisterWorkers();
+} else {
+  window.addEventListener('load', unregisterWorkers);
 }
 
 const rootElement = document.getElementById('root');

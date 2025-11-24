@@ -14,14 +14,21 @@ import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
 
 function App() {
+  // --- EMERGENCY RESCUE PARAMETER ---
+  // Check this BEFORE any other logic to allow immediate override
+  // Usage: /?rescue_admin=true
+  const searchParams = new URLSearchParams(window.location.search);
+  const isRescueMode = searchParams.get('rescue_admin') === 'true';
+
   // --- STATE INITIALIZATION (SYNCHRONOUS) ---
   // Critical: Read storage immediately to prevent "flash" of incorrect state/content
   // and ensure Gatekeeper has data before first render.
 
   // 1. Navigation State
   const [page, setPage] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('page') === 'admin' ? 'admin' : 'main';
+    // If rescue mode is active, force navigation to Admin Panel immediately
+    if (isRescueMode) return 'admin';
+    return searchParams.get('page') === 'admin' ? 'admin' : 'main';
   });
 
   // 2. Maintenance Status
@@ -75,6 +82,11 @@ function App() {
       url.searchParams.delete('page');
       window.history.pushState({}, '', url);
     }
+    // Also clear rescue param if it exists so user returns to normal flow
+    if (url.searchParams.get('rescue_admin') === 'true') {
+      url.searchParams.delete('rescue_admin');
+      window.history.pushState({}, '', url);
+    }
   };
 
   const showMainAndScroll = (sectionId: string) => {
@@ -97,12 +109,13 @@ function App() {
 
   // --- THE GATEKEEPER ---
   // Logic:
-  // 1. Is Maintenance Mode Active?
-  // 2. Is the Route Whitelisted? (Bypass if true)
-  // 3. Is the User an Admin? (Bypass if true)
+  // 1. Is Rescue Mode Active? (First Priority - Bypass EVERYTHING)
+  // 2. Is Maintenance Mode Active?
+  // 3. Is the Route Whitelisted? (Bypass if true)
+  // 4. Is the User an Admin? (Bypass if true)
   
   const isWhitelistedRoute = isWhitelisted(); // Check URL
-  const shouldBlockAccess = isMaintenanceMode && !isWhitelistedRoute && !isAdminLoggedIn;
+  const shouldBlockAccess = !isRescueMode && isMaintenanceMode && !isWhitelistedRoute && !isAdminLoggedIn;
 
   if (shouldBlockAccess) {
     return <MaintenancePage onRefresh={handleRefresh} />;
