@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -22,29 +21,30 @@ function App() {
   // Standard App Navigation State
   const [currentView, setCurrentView] = useState('hero'); 
 
-  // --- THE GLOBAL GUARD LOGIC ---
+  // --- THE GLOBAL GUARD LOGIC (The Brain) ---
   const checkSystemStatus = useCallback(() => {
     // 1. GET CURRENT URL DATA
-    // We check the hash specifically to allow access regardless of ?fbclid query params
+    // We check the hash specifically. This is the "Safe Zone" check.
     const currentHash = window.location.hash;
     
-    // 2. PRIORITY A: ADMIN IMMUNITY (The Whitelist)
-    // If the hash matches the secure admin route, we GRANT ACCESS immediately.
-    // We ignore the maintenance flag completely in this state.
+    // 2. PRIORITY A: ADMIN IMMUNITY (Safe Zone)
+    // CRITICAL: If the user is on the Admin URL, we STOP right here.
+    // We explicitly set maintenance to FALSE to ensure the Admin Panel never locks up.
     if (currentHash.includes('secure-admin-login')) {
       setIsAdminPortal(true);
-      setIsMaintenanceMode(false); // Force False so the UI doesn't lock
+      setIsMaintenanceMode(false); 
       return; 
     }
 
-    // If we are not in admin, ensure admin state is off
+    // If we reach here, the user is NOT in the safe zone.
     setIsAdminPortal(false);
 
-    // 3. PRIORITY B: REAL-TIME LOCKDOWN (The Kill Switch)
-    // In a production environment, this would be a Firebase/Supabase real-time listener.
-    // Here, we poll localStorage which acts as our synced "Database" across tabs.
+    // 3. PRIORITY B: REAL-TIME LISTENER (The Kill Switch)
+    // In a production app, this would be a Firebase/Supabase subscription.
+    // We simulate this "Database" using localStorage which syncs across tabs instantly.
     const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
     
+    // Trigger the Lockdown if active
     if (maintenanceActive) {
       setIsMaintenanceMode(true);
     } else {
@@ -69,6 +69,7 @@ function App() {
 
     // 4. Visibility Listener (Mobile/Facebook Browser Fix)
     // When user switches tabs or unlocks phone, re-verify status immediately.
+    // This fixes the "Frozen Background Tab" issue.
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkSystemStatus();
@@ -77,8 +78,8 @@ function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // 5. The Heartbeat (Real-Time Simulation)
-    // Polls every 1 second to catch changes if other events miss them.
-    const heartbeat = setInterval(checkSystemStatus, 1000);
+    // Polls every 500ms (0.5s) to ensure "Instant" reaction time.
+    const heartbeat = setInterval(checkSystemStatus, 500);
 
     // Cleanup
     return () => {
@@ -101,19 +102,20 @@ function App() {
 
   // --- RENDER LOGIC FLOW (Strict Priority) ---
   
-  // 1. ADMIN PANEL (Top Priority)
+  // 1. ADMIN PANEL (Top Priority - Safe Zone)
   // Renders if the hash is correct, ignoring maintenance state.
   if (isAdminPortal) {
     return <AdminPanel onBack={() => {
       // When exiting admin, clear hash. 
-      // The listeners will trigger and dump user into MaintenancePage if active.
+      // The listeners will trigger immediately and dump user into MaintenancePage if active.
       window.location.hash = ''; 
       setCurrentView('hero');
     }} />;
   }
 
-  // 2. MAINTENANCE SCREEN (Lockdown)
+  // 2. MAINTENANCE SCREEN (Lockdown - Target Zone)
   // Renders if maintenance is true AND user is not admin.
+  // This happens instantly when `isMaintenanceMode` flips to true.
   if (isMaintenanceMode) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
