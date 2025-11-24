@@ -13,7 +13,6 @@ import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
-import { MAINTENANCE_MODE } from './constants';
 
 function App() {
   // --- ISOLATED ADMIN ROUTE LOGIC ---
@@ -24,10 +23,12 @@ function App() {
 
   // Standard App Navigation State
   const [currentView, setCurrentView] = useState('hero'); 
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
 
   useEffect(() => {
     const handleHashChange = () => {
-      setIsAdminPortal(window.location.hash === '#/secure-admin-login');
+      const isSecure = window.location.hash === '#/secure-admin-login';
+      setIsAdminPortal(isSecure);
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -35,6 +36,28 @@ function App() {
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
+
+  // --- REAL-TIME MAINTENANCE LISTENER ---
+  // Listens for global system status changes
+  useEffect(() => {
+    const checkSystemStatus = () => {
+      // In a real production app, this would be an API call or WebSocket listener
+      const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
+      
+      // LOGIC: If maintenance is ON and we are NOT in the admin portal, lock the app.
+      // We do NOT handle the revert to 'false' here. We keep MaintenancePage mounted
+      // so it can handle the "Hard Reload" recovery strategy itself.
+      if (maintenanceActive && !isAdminPortal) {
+        setIsMaintenanceMode(true);
+      }
+    };
+
+    // Check immediately and then poll
+    checkSystemStatus();
+    const interval = setInterval(checkSystemStatus, 1000);
+
+    return () => clearInterval(interval);
+  }, [isAdminPortal]); // Re-run check if admin status changes
 
   const showMainAndScroll = (sectionId: string) => {
     setCurrentView('hero');
@@ -54,11 +77,15 @@ function App() {
     return <AdminPanel onBack={() => {
       window.location.hash = ''; // Clear hash to exit secure mode
       setCurrentView('hero');
+      // Re-check maintenance on exit
+      if (localStorage.getItem('allowance_aid_maintenance_mode') === 'true') {
+        setIsMaintenanceMode(true);
+      }
     }} />;
   }
 
   // LEVEL 2: MAINTENANCE MODE (Blocks regular users)
-  if (MAINTENANCE_MODE) {
+  if (isMaintenanceMode) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 

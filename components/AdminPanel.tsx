@@ -31,6 +31,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const [error, setError] = useState('');
   const [applications, setApplications] = useState<LoanApplication[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('All');
+  
+  // Maintenance State
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   useEffect(() => {
     // Check if already logged in this session
@@ -38,6 +41,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     if (sessionAuth === 'true') {
       setIsAuthenticated(true);
       loadApplications();
+      loadSystemStatus();
     }
   }, []);
 
@@ -48,6 +52,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     }
   };
 
+  const loadSystemStatus = () => {
+    const status = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
+    setMaintenanceMode(status);
+  }
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // Simple hardcoded credentials for demo purposes
@@ -55,6 +64,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       setIsAuthenticated(true);
       sessionStorage.setItem('adminAuth', 'true');
       loadApplications();
+      loadSystemStatus();
       setError('');
     } else {
       setError('Invalid credentials');
@@ -65,6 +75,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('adminAuth');
     onBack();
+  };
+
+  const toggleMaintenanceMode = () => {
+    const newStatus = !maintenanceMode;
+    setMaintenanceMode(newStatus);
+    localStorage.setItem('allowance_aid_maintenance_mode', String(newStatus));
+    
+    // Optional: Visual confirmation
+    if (newStatus) {
+        alert("SYSTEM ALERT: Maintenance Mode ACTIVATED. Users will be locked out.");
+    } else {
+        alert("SYSTEM ALERT: Maintenance Mode DEACTIVATED. Users will be redirected to the app.");
+    }
   };
 
   // Helper to calculate total repayment with interest
@@ -269,10 +292,33 @@ Body: (Sent successfully)`);
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* System Status & Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            {/* System Controller Card */}
+            <div className={`p-6 rounded-lg shadow border-l-4 ${maintenanceMode ? 'bg-yellow-50 border-yellow-500' : 'bg-green-50 border-green-500'}`}>
+                <h3 className="text-gray-700 text-sm font-bold uppercase mb-2">System Status</h3>
+                <div className="flex items-center justify-between">
+                    <span className={`text-lg font-bold ${maintenanceMode ? 'text-yellow-700' : 'text-green-700'}`}>
+                        {maintenanceMode ? 'MAINTENANCE' : 'LIVE'}
+                    </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            className="sr-only peer" 
+                            checked={maintenanceMode}
+                            onChange={toggleMaintenanceMode}
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+                    </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                    {maintenanceMode ? 'Users are currently locked out.' : 'System is accessible to students.'}
+                </p>
+            </div>
+
+            {/* Stats */}
             <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-gray-500 text-sm font-medium uppercase">Total Applications</h3>
+                <h3 className="text-gray-500 text-sm font-medium uppercase">Total Apps</h3>
                 <p className="text-3xl font-bold text-gray-900">{applications.length}</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow">
