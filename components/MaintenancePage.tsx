@@ -8,30 +8,40 @@ interface MaintenancePageProps {
 const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
   const [dots, setDots] = useState('');
 
-  // --- PRIORITY C: AUTO-RECOVERY & CACHE BUSTING ---
-  // This component acts as a "Gatekeeper" that only lets you leave
-  // if the system status says it's safe.
+  // --- PRIORITY C: AUTO-RECOVERY & AGGRESSIVE CACHE BUSTING ---
+  // This component acts as a "Gatekeeper". It keeps the user here until
+  // the system status flips to FALSE.
   useEffect(() => {
     const checkRecoveryStatus = () => {
-        // 1. Check the "Database"
+        // 1. Check the "Database" (Simulated via localStorage)
         const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
         
-        // 2. If Maintenance is explicitly OFF
+        // 2. If Maintenance is explicitly OFF, trigger recovery
         if (!maintenanceActive) {
-            console.log("System is back online. Initiating Recovery...");
+            console.log("System is back online. Initiating Recovery Protocols...");
+
+            // 3. Service Worker & Cache Cleanup (Requirement #4)
+            // If a SW exists, force it to update to avoid serving the cached Maintenance page
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then((registrations) => {
+                    for (const registration of registrations) {
+                        registration.update();
+                    }
+                });
+            }
             
-            // 3. CACHE BUSTING STRATEGY (Crucial for Facebook/Mobile)
+            // 4. AGGRESSIVE REDIRECT (Requirement #4 & Sticky Mobile Fix)
             // We append a timestamp to the URL. This forces the browser to treat 
             // the destination as a "new" page, bypassing the aggressive cache 
-            // that kept the user trapped on the Maintenance screen.
-            const recoveryUrl = '/?status=recovered&t=' + Date.now();
+            // of Facebook/Instagram in-app browsers.
+            const recoveryUrl = '/?status=restored&t=' + Date.now();
             
-            // 4. Force Navigation
+            // 5. Execute Redirect
             window.location.href = recoveryUrl;
         }
     };
 
-    // Poll every second (Real-time listener simulation)
+    // Poll every 1 second (Real-time listener simulation)
     const interval = setInterval(checkRecoveryStatus, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -62,9 +72,9 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
         </div>
 
         {/* Text Content */}
-        <h1 className="text-2xl md:text-3xl font-bold text-brand-blue-dark mb-2">We'll Be Right Back</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-brand-blue-dark mb-2">System Maintenance</h1>
         <p className="text-gray-600 mb-6 leading-relaxed">
-          The Allowance Aid system is currently undergoing scheduled maintenance to improve your experience.
+          The Allowance Aid system is currently undergoing scheduled maintenance. Access is temporarily restricted.
         </p>
         
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
@@ -73,14 +83,14 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                 </span>
-                Automatic Reconnection Active{dots}
+                Live Status: Monitoring{dots}
             </p>
             <p className="text-xs text-blue-600 mt-1">
-                You don't need to refresh. You will be redirected automatically once we are online.
+                You will be automatically redirected as soon as we are back online.
             </p>
         </div>
 
-        {/* Actions */}
+        {/* Actions (Manual Fallback) */}
         <button 
           onClick={onRefresh}
           className="bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium py-2 px-6 rounded-lg transition duration-300 w-full flex items-center justify-center gap-2 text-sm"
@@ -88,7 +98,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Try Manual Refresh
+            Manual Refresh
         </button>
       </div>
     </div>

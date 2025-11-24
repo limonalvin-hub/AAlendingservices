@@ -22,21 +22,43 @@ function App() {
   // Standard App Navigation State
   const [currentView, setCurrentView] = useState('hero'); 
 
-  // --- PRIORITY A: ADMIN WHITELIST CHECK ---
-  // Listens for hash changes to grant immunity regardless of query params (fbclid)
-  useEffect(() => {
-    const checkAdminHash = () => {
-      // Robust check: .includes allows for potential trailing slashes or params after hash
-      const isSecure = window.location.hash.includes('secure-admin-login');
-      setIsAdminPortal(isSecure);
-      return isSecure;
-    };
+  // --- HELPER: SYSTEM STATUS CHECK ---
+  // Defined outside useEffect to be accessible by both listeners
+  const checkSystemStatus = () => {
+    // PRIORITY A: ADMIN IMMUNITY
+    // We check the hash dynamically. This handles "dirty" URLs like /?fbclid=...#/secure-admin-login
+    const currentHash = window.location.hash;
+    const isSecureHash = currentHash.includes('secure-admin-login');
 
-    // Check on mount
-    const initialAdminState = checkAdminHash();
+    if (isSecureHash) {
+      // If we are in the Admin Portal, we FORCE maintenance mode off for this session
+      setIsAdminPortal(true);
+      setIsMaintenanceMode(false);
+      return;
+    }
+
+    setIsAdminPortal(false);
+
+    // PRIORITY B: REAL-TIME MAINTENANCE LOCKDOWN
+    // In a real app, this would be a Firestore onSnapshot or Supabase subscribe.
+    // For this implementation, we poll localStorage to simulate the "Database".
+    const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
+    
+    // LOGIC: If maintenance is ON and we are NOT in the admin portal, lock the app.
+    if (maintenanceActive) {
+      setIsMaintenanceMode(true);
+    } else {
+      setIsMaintenanceMode(false);
+    }
+  };
+
+  // --- LISTENER 1: HASH CHANGES (Navigation) ---
+  useEffect(() => {
+    // Run immediately on mount to determine initial state
+    checkSystemStatus();
 
     const handleHashChange = () => {
-      checkAdminHash();
+      checkSystemStatus();
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -45,39 +67,12 @@ function App() {
     };
   }, []);
 
-  // --- PRIORITY B: REAL-TIME MAINTENANCE LOCKDOWN ---
-  // Polls the "database" (localStorage) to lock the app instantly if not admin
+  // --- LISTENER 2: REAL-TIME DB POLLING (The "Brain") ---
   useEffect(() => {
-    const checkSystemStatus = () => {
-      // If we are already in the Admin Portal, we ignore maintenance checks completely
-      // This prevents the maintenance screen from flashing even for a millisecond
-      if (window.location.hash.includes('secure-admin-login')) {
-        setIsMaintenanceMode(false);
-        return;
-      }
-
-      const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
-      
-      // LOGIC: If maintenance is ON and we are NOT in the admin portal, lock the app.
-      if (maintenanceActive) {
-        setIsMaintenanceMode(true);
-      } else {
-        // Optional: If we want the App wrapper to handle "unlocking" without a hard reload,
-        // we can set this to false. However, MaintenancePage handles the "Hard Reload" 
-        // strategy for cache busting, so usually we let MaintenancePage handle the exit.
-        // But for development fluidity, we allow state to toggle back if needed.
-        setIsMaintenanceMode(false);
-      }
-    };
-
-    // Check immediately
-    checkSystemStatus();
-
-    // Poll every 1 second (Simulates Real-Time Database Subscription)
+    // Poll every 1 second to catch "Switch ON" events immediately
     const interval = setInterval(checkSystemStatus, 1000);
-
     return () => clearInterval(interval);
-  }, [isAdminPortal]); // Re-run if admin status changes
+  }, []);
 
   const showMainAndScroll = (sectionId: string) => {
     setCurrentView('hero');
@@ -89,26 +84,26 @@ function App() {
     }, 100);
   };
 
-  // --- RENDER LOGIC FLOW ---
+  // --- RENDER LOGIC FLOW (Strict Priority) ---
   
-  // 1. ADMIN IMMUNITY (Top Priority)
-  // Even if maintenance is TRUE, if isAdminPortal is TRUE, we render AdminPanel.
+  // 1. ADMIN PANEL (Top Priority)
+  // Renders if the hash is correct, ignoring maintenance state.
   if (isAdminPortal) {
     return <AdminPanel onBack={() => {
       // When exiting admin, clear hash. 
-      // The useEffects will trigger and likely dump user into MaintenancePage if active.
+      // The listeners will trigger and dump user into MaintenancePage if active.
       window.location.hash = ''; 
       setCurrentView('hero');
     }} />;
   }
 
-  // 2. MAINTENANCE LOCKDOWN
-  // If not admin, and maintenance is ON, block access.
+  // 2. MAINTENANCE SCREEN (Lockdown)
+  // Renders if maintenance is true AND user is not admin.
   if (isMaintenanceMode) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 
-  // 3. MAIN STUDENT APP (Standard Access)
+  // 3. MAIN APP (Standard Access)
   return (
     <div className="font-sans text-gray-800">
       {currentView === 'terms' ? (
