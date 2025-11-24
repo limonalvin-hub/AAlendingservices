@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -11,17 +11,29 @@ import Footer from './components/Footer';
 import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
+import MaintenancePage from './components/MaintenancePage';
 
 function App() {
   const [page, setPage] = useState('main');
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   // Check for admin URL parameter to potentially load admin page directly
   React.useEffect(() => {
+    // 1. Check Maintenance Status
+    const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
+    setIsMaintenanceMode(maintenanceStatus);
+
+    // 2. Check Admin Session
+    const adminSession = sessionStorage.getItem('adminAuth') === 'true';
+    setIsAdminLoggedIn(adminSession);
+
+    // 3. Handle URL Routing
     const params = new URLSearchParams(window.location.search);
     if (params.get('page') === 'admin') {
       setPage('admin');
     }
-  }, []);
+  }, [page]); // Re-run checks when page state changes
 
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
@@ -53,6 +65,17 @@ function App() {
   const goToAdmin = () => {
     setPage('admin');
   };
+
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
+  // --- ROUTE GUARD ---
+  // If Maintenance is ON, User is NOT Admin, and NOT trying to access Admin page -> Block Access
+  if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
+    return <MaintenancePage onRefresh={handleRefresh} onAdminLogin={goToAdmin} />;
+  }
+  // -------------------
 
   if (page === 'admin') {
     return <AdminPanel onBack={showMain} />;
