@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -22,57 +22,72 @@ function App() {
   // Standard App Navigation State
   const [currentView, setCurrentView] = useState('hero'); 
 
-  // --- HELPER: SYSTEM STATUS CHECK ---
-  // Defined outside useEffect to be accessible by both listeners
-  const checkSystemStatus = () => {
-    // PRIORITY A: ADMIN IMMUNITY
-    // We check the hash dynamically. This handles "dirty" URLs like /?fbclid=...#/secure-admin-login
+  // --- THE GLOBAL GUARD LOGIC ---
+  const checkSystemStatus = useCallback(() => {
+    // 1. GET CURRENT URL DATA
+    // We check the hash specifically to allow access regardless of ?fbclid query params
     const currentHash = window.location.hash;
-    const isSecureHash = currentHash.includes('secure-admin-login');
-
-    if (isSecureHash) {
-      // If we are in the Admin Portal, we FORCE maintenance mode off for this session
+    
+    // 2. PRIORITY A: ADMIN IMMUNITY (The Whitelist)
+    // If the hash matches the secure admin route, we GRANT ACCESS immediately.
+    // We ignore the maintenance flag completely in this state.
+    if (currentHash.includes('secure-admin-login')) {
       setIsAdminPortal(true);
-      setIsMaintenanceMode(false);
-      return;
+      setIsMaintenanceMode(false); // Force False so the UI doesn't lock
+      return; 
     }
 
+    // If we are not in admin, ensure admin state is off
     setIsAdminPortal(false);
 
-    // PRIORITY B: REAL-TIME MAINTENANCE LOCKDOWN
-    // In a real app, this would be a Firestore onSnapshot or Supabase subscribe.
-    // For this implementation, we poll localStorage to simulate the "Database".
+    // 3. PRIORITY B: REAL-TIME LOCKDOWN (The Kill Switch)
+    // In a production environment, this would be a Firebase/Supabase real-time listener.
+    // Here, we poll localStorage which acts as our synced "Database" across tabs.
     const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
     
-    // LOGIC: If maintenance is ON and we are NOT in the admin portal, lock the app.
     if (maintenanceActive) {
       setIsMaintenanceMode(true);
     } else {
       setIsMaintenanceMode(false);
     }
-  };
+  }, []);
 
-  // --- LISTENER 1: HASH CHANGES (Navigation) ---
+  // --- EVENT LISTENERS ---
   useEffect(() => {
-    // Run immediately on mount to determine initial state
+    // 1. Initial Check on Mount
     checkSystemStatus();
 
-    const handleHashChange = () => {
-      checkSystemStatus();
-    };
-
+    // 2. Hash Change Listener (Navigation Guard)
+    // Catches user trying to manually change URL to bypass logic
+    const handleHashChange = () => checkSystemStatus();
     window.addEventListener('hashchange', handleHashChange);
+
+    // 3. Storage Listener (Cross-Tab Synchronization)
+    // If Admin toggles the switch in Tab A, Tab B updates instantly.
+    const handleStorageChange = () => checkSystemStatus();
+    window.addEventListener('storage', handleStorageChange);
+
+    // 4. Visibility Listener (Mobile/Facebook Browser Fix)
+    // When user switches tabs or unlocks phone, re-verify status immediately.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkSystemStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 5. The Heartbeat (Real-Time Simulation)
+    // Polls every 1 second to catch changes if other events miss them.
+    const heartbeat = setInterval(checkSystemStatus, 1000);
+
+    // Cleanup
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(heartbeat);
     };
-  }, []);
-
-  // --- LISTENER 2: REAL-TIME DB POLLING (The "Brain") ---
-  useEffect(() => {
-    // Poll every 1 second to catch "Switch ON" events immediately
-    const interval = setInterval(checkSystemStatus, 1000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [checkSystemStatus]);
 
   const showMainAndScroll = (sectionId: string) => {
     setCurrentView('hero');

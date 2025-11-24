@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 
 interface MaintenancePageProps {
   onRefresh: () => void;
@@ -8,45 +8,60 @@ interface MaintenancePageProps {
 const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
   const [dots, setDots] = useState('');
 
-  // --- PRIORITY C: AUTO-RECOVERY & AGGRESSIVE CACHE BUSTING ---
-  // This component acts as a "Gatekeeper". It keeps the user here until
-  // the system status flips to FALSE.
-  useEffect(() => {
-    const checkRecoveryStatus = () => {
-        // 1. Check the "Database" (Simulated via localStorage)
-        const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
-        
-        // 2. If Maintenance is explicitly OFF, trigger recovery
-        if (!maintenanceActive) {
-            console.log("System is back online. Initiating Recovery Protocols...");
+  // --- LOGIC: AUTO-RECOVERY PROTOCOL ---
+  const checkRecoveryStatus = useCallback(() => {
+    // 1. Check Source of Truth
+    const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
+    
+    // 2. If Maintenance is OFF, Initiate Recovery
+    if (!maintenanceActive) {
+        console.log("System Status: ONLINE. Executing Recovery...");
 
-            // 3. Service Worker & Cache Cleanup (Requirement #4)
-            // If a SW exists, force it to update to avoid serving the cached Maintenance page
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then((registrations) => {
-                    for (const registration of registrations) {
-                        registration.update();
-                    }
-                });
-            }
-            
-            // 4. AGGRESSIVE REDIRECT (Requirement #4 & Sticky Mobile Fix)
-            // We append a timestamp to the URL. This forces the browser to treat 
-            // the destination as a "new" page, bypassing the aggressive cache 
-            // of Facebook/Instagram in-app browsers.
-            const recoveryUrl = '/?status=restored&t=' + Date.now();
-            
-            // 5. Execute Redirect
-            window.location.href = recoveryUrl;
+        // 3. Service Worker Cleanup (Force Update)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then((registrations) => {
+                for (const registration of registrations) {
+                    registration.update();
+                }
+            });
         }
-    };
-
-    // Poll every 1 second (Real-time listener simulation)
-    const interval = setInterval(checkRecoveryStatus, 1000);
-    return () => clearInterval(interval);
+        
+        // 4. CACHE BUSTING REDIRECT
+        // We add a timestamp query param to force the browser to treat this as a fresh request.
+        // This defeats the aggressive caching of Facebook/Instagram in-app browsers.
+        const recoveryUrl = '/?status=restored&t=' + Date.now();
+        
+        // 5. Execute
+        window.location.href = recoveryUrl;
+    }
   }, []);
 
-  // Visual Animation Effect (UX Polish)
+  // --- LISTENERS ---
+  useEffect(() => {
+    // 1. Heartbeat (Poll every 1s)
+    const interval = setInterval(checkRecoveryStatus, 1000);
+
+    // 2. Storage Sync (If tab is backgrounded but another tab updates)
+    window.addEventListener('storage', checkRecoveryStatus);
+
+    // 3. Visibility Wake-Up (Critical for Mobile)
+    // If user locks phone while on this screen, then unlocks it later,
+    // this fires immediately to check if we can let them back in.
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            checkRecoveryStatus();
+        }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+        clearInterval(interval);
+        window.removeEventListener('storage', checkRecoveryStatus);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [checkRecoveryStatus]);
+
+  // Visual Animation Effect
   useEffect(() => {
     const interval = setInterval(() => {
       setDots(prev => prev.length >= 3 ? '' : prev + '.');
