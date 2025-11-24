@@ -81,12 +81,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     
     // Confirmation Dialog
     const confirmMessage = newValue 
-        ? "Are you sure you want to ENABLE Maintenance Mode?\n\nStudents will be locked out.\nAdmin Login button will be HIDDEN.\n\nYou must access the admin panel via: /?page=admin" 
+        ? "Are you sure you want to ENABLE Maintenance Mode?\n\nStudents will be locked out immediately.\nAdmin 'Double Click' gesture will be HIDDEN.\n\nAdmins must access via: /?page=admin" 
         : "Are you sure you want to DISABLE Maintenance Mode? The application will be live for all users.";
     
     if (window.confirm(confirmMessage)) {
         setMaintenanceMode(newValue);
         localStorage.setItem('maintenance_mode', String(newValue));
+        
+        // Force reload to apply strict gatekeeping rules in App.tsx immediately
+        window.location.reload();
     }
   };
   // -----------------------------

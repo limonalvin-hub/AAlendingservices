@@ -5,9 +5,16 @@ interface HeaderProps {
   onShowApplicationForm: () => void;
   onShowMainAndScroll: (sectionId: string) => void;
   onGoToAdmin: () => void;
+  isMaintenanceMode: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ onShowHowItWorks, onShowApplicationForm, onShowMainAndScroll, onGoToAdmin }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  onShowHowItWorks, 
+  onShowApplicationForm, 
+  onShowMainAndScroll, 
+  onGoToAdmin,
+  isMaintenanceMode 
+}) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleMobileLinkClick = (action: () => void | Promise<void>) => {
@@ -20,10 +27,22 @@ const Header: React.FC<HeaderProps> = ({ onShowHowItWorks, onShowApplicationForm
     setIsMobileMenuOpen(false);
   };
 
+  // Logic: If maintenance is ON, disable the secret gesture.
+  // Admins must access via URL parameter (?page=admin).
+  const handleLogoAction = () => {
+    if (!isMaintenanceMode) {
+      onGoToAdmin();
+    }
+  };
+
   return (
     <header className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-6 py-3 flex justify-between items-center">
-        <div className="flex items-center group cursor-pointer" onDoubleClick={onGoToAdmin} title="Double click to access Admin">
+        <div 
+          className={`flex items-center group ${!isMaintenanceMode ? 'cursor-pointer' : 'cursor-default'}`} 
+          onDoubleClick={handleLogoAction} 
+          title={!isMaintenanceMode ? "Double click to access Admin" : "Allowance Aid"}
+        >
           <span className="text-xl font-bold text-brand-blue-dark select-none">Allowance Aid</span>
         </div>
         <nav className="hidden md:flex items-center space-x-6">

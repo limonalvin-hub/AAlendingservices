@@ -18,22 +18,37 @@ function App() {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
-  // Check for admin URL parameter to potentially load admin page directly
-  React.useEffect(() => {
-    // 1. Check Maintenance Status
-    const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
-    setIsMaintenanceMode(maintenanceStatus);
+  // Real-time System Check
+  // Polling ensures that if maintenance is toggled in one tab/device, 
+  // it immediately affects this session without refresh.
+  useEffect(() => {
+    const checkSystemStatus = () => {
+      // 1. Check Maintenance Status from Persistence
+      const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
+      setIsMaintenanceMode(maintenanceStatus);
 
-    // 2. Check Admin Session
-    const adminSession = sessionStorage.getItem('adminAuth') === 'true';
-    setIsAdminLoggedIn(adminSession);
+      // 2. Check Admin Session
+      const adminSession = sessionStorage.getItem('adminAuth') === 'true';
+      setIsAdminLoggedIn(adminSession);
+    };
 
-    // 3. Handle URL Routing
+    // Initial Check
+    checkSystemStatus();
+
+    // Continuous Polling (Every 500ms) - Implements "Immediate" Throwout
+    const intervalId = setInterval(checkSystemStatus, 500);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Handle URL Routing
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // Allow direct URL access to admin login even during maintenance
     if (params.get('page') === 'admin') {
       setPage('admin');
     }
-  }, [page]); // Re-run checks when page state changes
+  }, []);
 
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
@@ -61,7 +76,7 @@ function App() {
     }, 100);
   };
 
-  // Hidden trigger for Admin Panel (can be accessed via URL ?page=admin or hidden gesture)
+  // Hidden trigger for Admin Panel
   const goToAdmin = () => {
     setPage('admin');
   };
@@ -70,13 +85,15 @@ function App() {
     window.location.reload();
   };
 
-  // --- ROUTE GUARD ---
-  // If Maintenance is ON, User is NOT Admin, and NOT trying to access Admin page -> Block Access
-  // CRITICAL: This allows ?page=admin to bypass the lock screen so Admins can log in.
+  // --- STRICT SYSTEM GUARD ---
+  // 1. If Maintenance is ON
+  // 2. AND User is NOT an Admin
+  // 3. AND User is NOT explicitly on the Admin Login URL (?page=admin)
+  // -> THEN: Force Redirect to Maintenance Page
   if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
     return <MaintenancePage onRefresh={handleRefresh} />;
   }
-  // -------------------
+  // ---------------------------
 
   if (page === 'admin') {
     return <AdminPanel onBack={showMain} />;
@@ -105,6 +122,7 @@ function App() {
         onShowApplicationForm={showApplicationForm}
         onShowMainAndScroll={showMainAndScroll}
         onGoToAdmin={goToAdmin}
+        isMaintenanceMode={isMaintenanceMode}
       />
       <main>
         <Hero 
