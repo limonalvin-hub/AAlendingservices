@@ -14,24 +14,52 @@ import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
 
 function App() {
-  // Check URL parameters for direct Admin access (e.g., ?page=admin)
-  // This is the Critical Exception allowing the Admin to bypass the maintenance lock.
+  // --- STATE INITIALIZATION (SYNCHRONOUS) ---
+  // Critical: Read storage immediately to prevent "flash" of incorrect state/content
+  // and ensure Gatekeeper has data before first render.
+
+  // 1. Navigation State
   const [page, setPage] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('page') === 'admin' ? 'admin' : 'main';
   });
 
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  // 2. Maintenance Status
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(() => {
+    return localStorage.getItem('maintenance_mode') === 'true';
+  });
+
+  // 3. Admin Session
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return sessionStorage.getItem('adminAuth') === 'true';
+  });
+
+  // --- MIDDLEWARE: ROUTE WHITELISTING ---
+  // Checks if the current URL is explicitly allowed to bypass Maintenance Mode.
+  const isWhitelisted = () => {
+    const params = new URLSearchParams(window.location.search);
+    const currentPath = window.location.pathname;
+
+    // 1. Allow Admin Query Parameter (Current Architecture)
+    if (params.get('page') === 'admin') return true;
+
+    // 2. Allow Explicit Admin Paths (Future-proofing/Server-side routing)
+    if (currentPath.startsWith('/admin')) return true;
+    if (currentPath.startsWith('/login')) return true;
+
+    return false;
+  };
 
   useEffect(() => {
-    // 1. Check Maintenance Status from "Database" (LocalStorage)
-    const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
-    setIsMaintenanceMode(maintenanceStatus);
+    // Listener for cross-tab synchronization
+    // If Admin toggles maintenance in one tab, others update instantly.
+    const handleStorageChange = () => {
+      setIsMaintenanceMode(localStorage.getItem('maintenance_mode') === 'true');
+      setIsAdminLoggedIn(sessionStorage.getItem('adminAuth') === 'true');
+    };
 
-    // 2. Check Admin Session Validity
-    const adminAuth = sessionStorage.getItem('adminAuth') === 'true';
-    setIsAdminLoggedIn(adminAuth);
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const showTerms = () => setPage('terms');
@@ -68,11 +96,19 @@ function App() {
   };
 
   // --- THE GATEKEEPER ---
-  // If Maintenance Mode is TRUE, AND user is NOT on the Admin page, AND not already logged in...
-  // Redirect to Maintenance View.
-  if (isMaintenanceMode && page !== 'admin' && !isAdminLoggedIn) {
+  // Logic:
+  // 1. Is Maintenance Mode Active?
+  // 2. Is the Route Whitelisted? (Bypass if true)
+  // 3. Is the User an Admin? (Bypass if true)
+  
+  const isWhitelistedRoute = isWhitelisted(); // Check URL
+  const shouldBlockAccess = isMaintenanceMode && !isWhitelistedRoute && !isAdminLoggedIn;
+
+  if (shouldBlockAccess) {
     return <MaintenancePage onRefresh={handleRefresh} />;
   }
+
+  // --- ROUTING LOGIC ---
 
   if (page === 'admin') {
     return <AdminPanel onBack={showMain} />;
