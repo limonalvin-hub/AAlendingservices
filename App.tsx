@@ -13,16 +13,24 @@ import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
-import { MAINTENANCE_MODE } from './constants';
+import { MAINTENANCE_MODE as DEFAULT_MAINTENANCE_MODE } from './constants';
 
 function App() {
   // --- "HASH-AWARE" GUARD (SAFE ZONE) ---
-  // CRITICAL: This logic MUST run before any maintenance checks.
-  // It whitelists the specific admin hash to prevent lockout.
   const ADMIN_HASH_ROUTE = '#/secure-admin-login';
   
   const [isAdminPortal, setIsAdminPortal] = useState(() => {
     return window.location.hash === ADMIN_HASH_ROUTE;
+  });
+
+  // --- DYNAMIC MAINTENANCE STATE ---
+  // We prioritize LocalStorage (set by Admin) over the constant file
+  const [isSystemMaintenance, setIsSystemMaintenance] = useState(() => {
+    const stored = localStorage.getItem('SYSTEM_MAINTENANCE_ACTIVE');
+    if (stored !== null) {
+      return JSON.parse(stored);
+    }
+    return DEFAULT_MAINTENANCE_MODE;
   });
 
   // Standard App Navigation State
@@ -52,18 +60,29 @@ function App() {
     }, 100);
   };
 
+  const handleMaintenanceToggle = (isActive: boolean) => {
+    setIsSystemMaintenance(isActive);
+    localStorage.setItem('SYSTEM_MAINTENANCE_ACTIVE', JSON.stringify(isActive));
+  };
+
   // --- PRIORITY RENDERING SYSTEM ---
   
   // LEVEL 1: ADMIN PORTAL (Safe Zone - Exempt from Maintenance)
   if (isAdminPortal) {
-    return <AdminPanel onBack={() => {
-      window.location.hash = ''; // Clear hash to exit secure mode
-      setCurrentView('hero');
-    }} />;
+    return (
+      <AdminPanel 
+        onBack={() => {
+          window.location.hash = ''; // Clear hash to exit secure mode
+          setCurrentView('hero');
+        }}
+        isMaintenanceMode={isSystemMaintenance}
+        onToggleMaintenance={handleMaintenanceToggle}
+      />
+    );
   }
 
   // LEVEL 2: SYSTEM MAINTENANCE MODE (Blocks all non-admin traffic)
-  if (MAINTENANCE_MODE) {
+  if (isSystemMaintenance) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 
