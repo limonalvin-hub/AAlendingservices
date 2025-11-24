@@ -18,33 +18,46 @@ function App() {
   const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
-  // Real-time System Check
-  // Polling ensures that if maintenance is toggled in one tab/device, 
-  // it immediately affects this session without refresh.
+  // --- STRICT SYSTEM GUARD ---
+  // Real-time System Check using Polling
+  // This simulates a websocket or server-push notification.
+  // It ensures that even without a page refresh, a user is "thrown out" 
+  // if maintenance is toggled on the backend.
   useEffect(() => {
     const checkSystemStatus = () => {
-      // 1. Check Maintenance Status from Persistence
+      // 1. Check Global Maintenance Status
+      // In a real app, this would be an API call like await fetch('/api/status')
       const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
-      setIsMaintenanceMode(maintenanceStatus);
-
-      // 2. Check Admin Session
+      
+      // 2. Check Admin Session Validity
       const adminSession = sessionStorage.getItem('adminAuth') === 'true';
+      
+      setIsMaintenanceMode(maintenanceStatus);
       setIsAdminLoggedIn(adminSession);
+
+      // Force Logout / Session Invalidation Logic
+      // If maintenance is ON, and user is NOT admin, and currently viewing a protected page,
+      // we don't just redirect, we can also choose to clear temporary session data here if needed.
     };
 
     // Initial Check
     checkSystemStatus();
 
-    // Continuous Polling (Every 500ms) - Implements "Immediate" Throwout
+    // Continuous Polling (Every 500ms) 
+    // This high-frequency check ensures "Immediate" restriction across tabs/windows.
     const intervalId = setInterval(checkSystemStatus, 500);
 
     return () => clearInterval(intervalId);
   }, []);
 
-  // Handle URL Routing
+  // Handle URL Routing & Admin Direct Access
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // Allow direct URL access to admin login even during maintenance
+    
+    // CRITICAL: Admin Exception
+    // We allow the router to set the page to 'admin' if the URL parameter exists.
+    // The actual authentication check happens inside the AdminPanel component
+    // or the guard clause below.
     if (params.get('page') === 'admin') {
       setPage('admin');
     }
@@ -57,7 +70,7 @@ function App() {
   
   const showMain = () => {
     setPage('main');
-    // Clean URL param if exists
+    // Clean URL param if exists to keep URL clean
     const url = new URL(window.location.href);
     if (url.searchParams.get('page') === 'admin') {
       url.searchParams.delete('page');
@@ -67,7 +80,6 @@ function App() {
 
   const showMainAndScroll = (sectionId: string) => {
     setPage('main');
-    // Use a short delay to ensure the main page is rendered before scrolling
     setTimeout(() => {
       const element = document.getElementById(sectionId);
       if (element) {
@@ -76,20 +88,21 @@ function App() {
     }, 100);
   };
 
-  // Hidden trigger for Admin Panel
+  // Hidden trigger for Admin Panel (Only works if not in maintenance)
   const goToAdmin = () => {
     setPage('admin');
   };
 
   const handleRefresh = () => {
+    // Hard reload to bypass cache when checking status
     window.location.reload();
   };
 
-  // --- STRICT SYSTEM GUARD ---
-  // 1. If Maintenance is ON
-  // 2. AND User is NOT an Admin
-  // 3. AND User is NOT explicitly on the Admin Login URL (?page=admin)
-  // -> THEN: Force Redirect to Maintenance Page
+  // --- GUARD CLAUSE: THE THROWOUT ---
+  // 1. IF Maintenance is ON
+  // 2. AND User is NOT an Authenticated Admin
+  // 3. AND User is NOT attempting to reach the admin portal explicitly
+  // -> THEN: Render Maintenance Page (Blocking all other components)
   if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
     return <MaintenancePage onRefresh={handleRefresh} />;
   }
