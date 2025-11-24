@@ -81,7 +81,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     
     // Confirmation Dialog
     const confirmMessage = newValue 
-        ? "Are you sure you want to ENABLE Maintenance Mode? Students will be locked out of the application." 
+        ? "Are you sure you want to ENABLE Maintenance Mode?\n\nStudents will be locked out.\nAdmin Login button will be HIDDEN.\n\nYou must access the admin panel via: /?page=admin" 
         : "Are you sure you want to DISABLE Maintenance Mode? The application will be live for all users.";
     
     if (window.confirm(confirmMessage)) {

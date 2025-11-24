@@ -2,10 +2,9 @@ import React from 'react';
 
 interface MaintenancePageProps {
   onRefresh: () => void;
-  onAdminLogin: () => void;
 }
 
-const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh, onAdminLogin }) => {
+const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center px-4">
       <div className="max-w-lg w-full bg-white p-8 rounded-xl shadow-2xl text-center animate-fade-in border-t-4 border-yellow-500">
@@ -23,7 +22,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh, onAdminLog
         {/* Text Content */}
         <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">System Under Maintenance</h1>
         <p className="text-gray-600 mb-8 leading-relaxed">
-          We are currently updating Allowance Aid to serve you better. 
+          Allowance Aid is currently being updated to serve you better. 
           <br className="hidden sm:block" />
           Access is temporarily unavailable to prevent data conflicts.
           <br/>
@@ -43,12 +42,9 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh, onAdminLog
             </button>
         </div>
 
-        {/* Footer */}
+        {/* Footer - Strict No Navigation Policy */}
         <div className="mt-8 text-sm text-gray-400">
           <p>&copy; Allowance Aid Lending Services</p>
-          <button onClick={onAdminLogin} className="mt-4 text-xs text-gray-300 hover:text-gray-500 underline">
-            Admin Login
-          </button>
         </div>
       </div>
     </div>

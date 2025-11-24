@@ -72,8 +72,9 @@ function App() {
 
   // --- ROUTE GUARD ---
   // If Maintenance is ON, User is NOT Admin, and NOT trying to access Admin page -> Block Access
+  // CRITICAL: This allows ?page=admin to bypass the lock screen so Admins can log in.
   if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
-    return <MaintenancePage onRefresh={handleRefresh} onAdminLogin={goToAdmin} />;
+    return <MaintenancePage onRefresh={handleRefresh} />;
   }
   // -------------------
 
