@@ -1,7 +1,22 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+
+// --- SERVICE WORKER KILL SWITCH ---
+// We aggressively unregister any service workers to prevent stale content caching
+// which is critical for the "Strict Maintenance Mode" feature.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for (let registration of registrations) {
+      registration.unregister()
+        .then(function() {
+          console.log('Service Worker unregistered to ensure fresh content.');
+        });
+    }
+  }).catch(function(error) {
+    console.error('Error unregistering service worker:', error);
+  });
+}
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

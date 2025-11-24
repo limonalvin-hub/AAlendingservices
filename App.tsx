@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -15,12 +15,8 @@ import MaintenancePage from './components/MaintenancePage';
 
 function App() {
   // --- STRICT SYSTEM GUARD: SYNCHRONOUS INITIALIZATION ---
-  // We initialize state lazily to check localStorage BEFORE the first render.
-  // This simulates a "Server-Side" block because the unauthorized view is never mounted to the DOM.
-
   const [page, setPage] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    // Explicitly check URL params during init to prevent "flash" of main content
     return params.get('page') === 'admin' ? 'admin' : 'main';
   });
 
@@ -32,36 +28,50 @@ function App() {
     return sessionStorage.getItem('adminAuth') === 'true';
   });
 
-  // --- UNIVERSAL BROWSER ENFORCEMENT ---
+  // Keep track of previous state to detect transitions
+  const prevMaintenanceRef = useRef(isMaintenanceMode);
+
+  // --- UNIVERSAL BROWSER ENFORCEMENT & FORCE KICK ---
   const checkSystemStatus = useCallback(() => {
     // 1. Check Global Maintenance Status
-    const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
+    const nextMaintenance = localStorage.getItem('maintenance_mode') === 'true';
     
     // 2. Check Admin Session Validity
-    const adminSession = sessionStorage.getItem('adminAuth') === 'true';
+    const nextAdmin = sessionStorage.getItem('adminAuth') === 'true';
+
+    // --- FORCE KICK LOGIC ---
+    // If maintenance was OFF and is now ON, and user is not Admin...
+    if (!prevMaintenanceRef.current && nextMaintenance) {
+      if (!nextAdmin) {
+        console.warn("Maintenance activated while session active. Force kicking user.");
+        // Force a hard reload from the server to bypass cache
+        window.location.reload(); 
+        return; 
+      }
+    }
+
+    prevMaintenanceRef.current = nextMaintenance;
     
-    // Only update if changed to avoid unnecessary re-renders
-    setIsMaintenanceMode(maintenanceStatus);
-    setIsAdminLoggedIn(adminSession);
+    // Only update state if changed to avoid re-renders
+    setIsMaintenanceMode(prev => prev !== nextMaintenance ? nextMaintenance : prev);
+    setIsAdminLoggedIn(prev => prev !== nextAdmin ? nextAdmin : prev);
   }, []);
 
   useEffect(() => {
     // Initial Check
     checkSystemStatus();
 
-    // 1. Polling (Fall-back for standard browsers)
-    const intervalId = setInterval(checkSystemStatus, 500);
+    // 1. Polling (Real-time listener)
+    // Runs every 1 second to catch maintenance toggle quickly
+    const intervalId = setInterval(checkSystemStatus, 1000);
 
     // 2. Storage Event (Cross-Tab Sync)
-    // If admin toggles maintenance in one tab, all other tabs update instantly.
     window.addEventListener('storage', checkSystemStatus);
 
-    // 3. Visibility Change (App Switching)
-    // Critical for Mobile: User switches to Facebook/Messenger then back to Chrome/Safari.
+    // 3. Visibility Change (App Switching - Facebook/Mobile)
     document.addEventListener('visibilitychange', checkSystemStatus);
 
     // 4. PageShow Event (BFCache / History Navigation)
-    // Critical for Safari/iOS: Ensures logic runs even when hitting "Back" button from cache.
     window.addEventListener('pageshow', checkSystemStatus);
 
     return () => {
@@ -79,7 +89,6 @@ function App() {
   
   const showMain = () => {
     setPage('main');
-    // Clean URL param if exists to keep URL clean
     const url = new URL(window.location.href);
     if (url.searchParams.get('page') === 'admin') {
       url.searchParams.delete('page');
@@ -97,7 +106,6 @@ function App() {
     }, 100);
   };
 
-  // Hidden trigger for Admin Panel (Only works if not in maintenance)
   const goToAdmin = () => {
     setPage('admin');
   };
@@ -108,15 +116,9 @@ function App() {
   };
 
   // --- GUARD CLAUSE: THE THROWOUT ---
-  // 1. IF Maintenance is ON
-  // 2. AND User is NOT an Authenticated Admin
-  // 3. AND User is NOT currently on the admin login page
-  // -> THEN: Render Maintenance Page immediately.
-  // This return statement prevents the main app tree from ever mounting.
   if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
     return <MaintenancePage onRefresh={handleRefresh} />;
   }
-  // ---------------------------
 
   if (page === 'admin') {
     return <AdminPanel onBack={showMain} />;
