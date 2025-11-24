@@ -24,27 +24,26 @@ function App() {
   // --- THE GLOBAL GUARD LOGIC (The Brain) ---
   const checkSystemStatus = useCallback(() => {
     // 1. GET CURRENT URL DATA
-    // We check the hash specifically. This is the "Safe Zone" check.
     const currentHash = window.location.hash;
     
-    // 2. PRIORITY A: ADMIN IMMUNITY (Safe Zone)
-    // CRITICAL: If the user is on the Admin URL, we STOP right here.
-    // We explicitly set maintenance to FALSE to ensure the Admin Panel never locks up.
+    // --- 🛡️ THE SAFE ZONE RULE 🛡️ ---
+    // Critical: The Admin URL must NEVER be affected by maintenance mode.
+    // If we detect the secure admin hash, we allow access immediately and STOP checks.
     if (currentHash.includes('secure-admin-login')) {
       setIsAdminPortal(true);
-      setIsMaintenanceMode(false); 
+      setIsMaintenanceMode(false); // Force maintenance OFF for admin
       return; 
     }
 
     // If we reach here, the user is NOT in the safe zone.
     setIsAdminPortal(false);
 
-    // 3. PRIORITY B: REAL-TIME LISTENER (The Kill Switch)
-    // In a production app, this would be a Firebase/Supabase subscription.
-    // We simulate this "Database" using localStorage which syncs across tabs instantly.
+    // 2. REAL-TIME LISTENER (The Kill Switch)
+    // Checks the "Database" (simulated via localStorage) for the global flag.
     const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
     
-    // Trigger the Lockdown if active
+    // 3. CONDITIONAL FORCE KICK
+    // If maintenance is ON and we are NOT the admin (checked above), lockdown.
     if (maintenanceActive) {
       setIsMaintenanceMode(true);
     } else {

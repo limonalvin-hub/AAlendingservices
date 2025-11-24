@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 
 interface MaintenancePageProps {
@@ -14,34 +13,38 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
     // 2. If Maintenance is OFF, Initiate Recovery
     if (!maintenanceActive) {
         console.log("System Status: ONLINE. Executing Recovery...");
-
-        // 3. Service Worker Cleanup (Force Update)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then((registrations) => {
-                for (const registration of registrations) {
-                    registration.update();
-                }
-            });
-        }
         
-        // 4. CACHE BUSTING REDIRECT
+        // 3. CACHE BUSTING REDIRECT
         // We add a timestamp query param to force the browser to treat this as a fresh request.
         const recoveryUrl = '/?status=restored&t=' + Date.now();
         
-        // 5. Execute
+        // 4. Execute
         window.location.href = recoveryUrl;
     }
   }, []);
 
   // --- LISTENERS ---
   useEffect(() => {
-    // 1. Heartbeat (Poll every 1s)
+    // 1. FORCE KICK: UNREGISTER SERVICE WORKERS
+    // This is critical for mobile/Facebook browsers. We nuke the Service Worker
+    // so that when the site comes back online, the browser is forced to fetch fresh assets.
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const registration of registrations) {
+                registration.unregister().then(() => {
+                    console.log("SW Unregistered to prevent stale cache.");
+                });
+            }
+        });
+    }
+
+    // 2. Heartbeat (Poll every 1s)
     const interval = setInterval(checkRecoveryStatus, 1000);
 
-    // 2. Storage Sync (If tab is backgrounded but another tab updates)
+    // 3. Storage Sync (If tab is backgrounded but another tab updates)
     window.addEventListener('storage', checkRecoveryStatus);
 
-    // 3. Visibility Wake-Up (Critical for Mobile)
+    // 4. Visibility Wake-Up (Critical for Mobile)
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
             checkRecoveryStatus();
