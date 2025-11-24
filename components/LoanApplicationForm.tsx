@@ -236,10 +236,14 @@ IMPORTANT: Please attach the required files before sending:
       <div className="container mx-auto px-4 md:px-6">
         <div className="max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-lg">
           {isSubmitted ? (
-            <div className="text-center">
-              <svg className="w-16 h-16 mx-auto mb-4 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            <div className="text-center animate-fade-in">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-up">
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
               <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done! Please Send Your Application</h3>
-              <p className="text-gray-600 mb-6">We've opened your default email client with your application details pre-filled. Please review the information, attach your documents, and then click 'Send' to complete your application.</p>
+              <p className="text-gray-600 mb-6">We've prepared your application. Please verify the details in your email client and click 'Send' to complete your application.</p>
               <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md" role="alert">
                   <p className="font-bold">Important:</p>
                   <p>Don't forget to attach your Certificate of Registration (COR) and School ID picture before sending the email.</p>

@@ -30,6 +30,38 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onBack }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // --- AUTOMATIC ADMIN REFLECTION LOGIC ---
+    // 1. Get existing applications
+    try {
+      const storedApps = localStorage.getItem('loanApplications');
+      if (storedApps) {
+        let apps = JSON.parse(storedApps);
+        let matchFound = false;
+
+        // 2. Find matching application (Name & Phone) that is Approved or Pending
+        // We update it to 'Paid' automatically so the Admin sees it instantly.
+        apps = apps.map((app: any) => {
+          if (
+            app.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
+            app.phone.trim() === formData.phone.trim() &&
+            (app.status === 'Approved' || app.status === 'Pending')
+          ) {
+            matchFound = true;
+            return { ...app, status: 'Paid' };
+          }
+          return app;
+        });
+
+        // 3. Save back to storage if a match was updated
+        if (matchFound) {
+          localStorage.setItem('loanApplications', JSON.stringify(apps));
+          console.log("Payment automatically matched and record updated to Paid.");
+        }
+      }
+    } catch (err) {
+      console.error("Error updating payment status:", err);
+    }
+
     // Simulate redirection for E-wallets
     if (formData.method === 'gcash') {
         window.open('https://m.gcash.com', '_blank');
@@ -45,8 +77,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onBack }) => {
     return (
       <div className="min-h-screen bg-gray-100 py-10 flex items-center justify-center">
         <div className="container mx-auto px-4">
-          <div className="max-w-lg mx-auto bg-white p-8 rounded-xl shadow-lg text-center">
-            <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="max-w-lg mx-auto bg-white p-8 rounded-xl shadow-lg text-center animate-fade-in">
+            <div className="w-16 h-16 bg-green-100 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-scale-up">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
