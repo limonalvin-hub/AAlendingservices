@@ -32,7 +32,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   
   // Settings State
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [maintenanceDuration, setMaintenanceDuration] = useState<number>(60); // Default 60 mins
 
   useEffect(() => {
     // Check if already logged in this session
@@ -82,21 +81,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     
     // Confirmation Dialog
     const confirmMessage = newValue 
-        ? `Are you sure you want to ENABLE Maintenance Mode for approx. ${maintenanceDuration} minutes?\n\nStudents will be locked out immediately.\nAdmin 'Double Click' gesture will be HIDDEN.\n\nAdmins must access via: /?page=admin` 
+        ? "Are you sure you want to ENABLE Maintenance Mode?\n\nStudents will be locked out immediately.\nAdmin 'Double Click' gesture will be HIDDEN.\n\nAdmins must access via: /?page=admin" 
         : "Are you sure you want to DISABLE Maintenance Mode? The application will be live for all users.";
     
     if (window.confirm(confirmMessage)) {
         setMaintenanceMode(newValue);
         localStorage.setItem('maintenance_mode', String(newValue));
-        
-        if (newValue) {
-          // Set End Time
-          const endTime = Date.now() + (maintenanceDuration * 60 * 1000);
-          localStorage.setItem('maintenance_end_time', endTime.toString());
-        } else {
-          // Clear End Time
-          localStorage.removeItem('maintenance_end_time');
-        }
         
         // Force reload to apply strict gatekeeping rules in App.tsx immediately
         window.location.reload();
@@ -319,38 +309,22 @@ Body: (Sent successfully)`);
                 <p className="text-gray-300 text-sm mt-1">Manage global application availability.</p>
             </div>
             
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-                {!maintenanceMode && (
-                  <div className="flex items-center gap-2 bg-gray-600 rounded p-1.5">
-                    <label htmlFor="duration" className="text-xs text-gray-300">Duration (mins):</label>
-                    <input 
-                      id="duration"
-                      type="number" 
-                      min="1"
-                      value={maintenanceDuration}
-                      onChange={(e) => setMaintenanceDuration(parseInt(e.target.value) || 0)}
-                      className="w-16 text-black px-2 py-0.5 rounded text-sm focus:outline-none"
+            <div className="flex items-center bg-gray-900 rounded-lg p-1">
+                <span className={`px-3 py-1 text-sm font-medium ${maintenanceMode ? 'text-gray-400' : 'text-green-400'}`}>
+                    {maintenanceMode ? 'System Offline' : 'System Online'}
+                </span>
+                <button 
+                    onClick={toggleMaintenanceMode}
+                    className={`ml-3 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${maintenanceMode ? 'bg-yellow-500' : 'bg-gray-600'}`}
+                >
+                    <span className="sr-only">Enable Maintenance Mode</span>
+                    <span 
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} 
                     />
-                  </div>
-                )}
-                
-                <div className="flex items-center bg-gray-900 rounded-lg p-1">
-                    <span className={`px-3 py-1 text-sm font-medium ${maintenanceMode ? 'text-gray-400' : 'text-green-400'}`}>
-                        {maintenanceMode ? 'System Offline' : 'System Online'}
-                    </span>
-                    <button 
-                        onClick={toggleMaintenanceMode}
-                        className={`ml-3 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${maintenanceMode ? 'bg-yellow-500' : 'bg-gray-600'}`}
-                    >
-                        <span className="sr-only">Enable Maintenance Mode</span>
-                        <span 
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${maintenanceMode ? 'translate-x-6' : 'translate-x-1'}`} 
-                        />
-                    </button>
-                    <span className="ml-3 text-sm font-bold text-white mr-2">
-                        Mode: {maintenanceMode ? 'ON' : 'OFF'}
-                    </span>
-                </div>
+                </button>
+                <span className="ml-3 text-sm font-bold text-white mr-2">
+                    Mode: {maintenanceMode ? 'ON' : 'OFF'}
+                </span>
             </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -14,73 +14,25 @@ import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
 
 function App() {
-  // --- STRICT SYSTEM GUARD: SYNCHRONOUS INITIALIZATION ---
+  // Check URL parameters for direct Admin access (e.g., ?page=admin)
+  // This is the Critical Exception allowing the Admin to bypass the maintenance lock.
   const [page, setPage] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('page') === 'admin' ? 'admin' : 'main';
   });
 
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(() => {
-    return localStorage.getItem('maintenance_mode') === 'true';
-  });
-
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return sessionStorage.getItem('adminAuth') === 'true';
-  });
-
-  // Keep track of previous state to detect transitions
-  const prevMaintenanceRef = useRef(isMaintenanceMode);
-
-  // --- UNIVERSAL BROWSER ENFORCEMENT & FORCE KICK ---
-  const checkSystemStatus = useCallback(() => {
-    // 1. Check Global Maintenance Status
-    const nextMaintenance = localStorage.getItem('maintenance_mode') === 'true';
-    
-    // 2. Check Admin Session Validity
-    const nextAdmin = sessionStorage.getItem('adminAuth') === 'true';
-
-    // --- FORCE KICK LOGIC ---
-    // If maintenance was OFF and is now ON, and user is not Admin...
-    if (!prevMaintenanceRef.current && nextMaintenance) {
-      if (!nextAdmin) {
-        console.warn("Maintenance activated while session active. Force kicking user.");
-        // Force a hard reload from the server to bypass cache
-        window.location.reload(); 
-        return; 
-      }
-    }
-
-    prevMaintenanceRef.current = nextMaintenance;
-    
-    // Only update state if changed to avoid re-renders
-    setIsMaintenanceMode(prev => prev !== nextMaintenance ? nextMaintenance : prev);
-    setIsAdminLoggedIn(prev => prev !== nextAdmin ? nextAdmin : prev);
-  }, []);
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   useEffect(() => {
-    // Initial Check
-    checkSystemStatus();
+    // 1. Check Maintenance Status from "Database" (LocalStorage)
+    const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
+    setIsMaintenanceMode(maintenanceStatus);
 
-    // 1. Polling (Real-time listener)
-    // Runs every 1 second to catch maintenance toggle quickly
-    const intervalId = setInterval(checkSystemStatus, 1000);
-
-    // 2. Storage Event (Cross-Tab Sync)
-    window.addEventListener('storage', checkSystemStatus);
-
-    // 3. Visibility Change (App Switching - Facebook/Mobile)
-    document.addEventListener('visibilitychange', checkSystemStatus);
-
-    // 4. PageShow Event (BFCache / History Navigation)
-    window.addEventListener('pageshow', checkSystemStatus);
-
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('storage', checkSystemStatus);
-      document.removeEventListener('visibilitychange', checkSystemStatus);
-      window.removeEventListener('pageshow', checkSystemStatus);
-    };
-  }, [checkSystemStatus]);
+    // 2. Check Admin Session Validity
+    const adminAuth = sessionStorage.getItem('adminAuth') === 'true';
+    setIsAdminLoggedIn(adminAuth);
+  }, []);
 
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
@@ -89,6 +41,7 @@ function App() {
   
   const showMain = () => {
     setPage('main');
+    // Clear the URL param if going back to main to keep URL clean
     const url = new URL(window.location.href);
     if (url.searchParams.get('page') === 'admin') {
       url.searchParams.delete('page');
@@ -111,12 +64,13 @@ function App() {
   };
 
   const handleRefresh = () => {
-    // Hard reload to bypass cache when checking status
     window.location.reload();
   };
 
-  // --- GUARD CLAUSE: THE THROWOUT ---
-  if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
+  // --- THE GATEKEEPER ---
+  // If Maintenance Mode is TRUE, AND user is NOT on the Admin page, AND not already logged in...
+  // Redirect to Maintenance View.
+  if (isMaintenanceMode && page !== 'admin' && !isAdminLoggedIn) {
     return <MaintenancePage onRefresh={handleRefresh} />;
   }
 
