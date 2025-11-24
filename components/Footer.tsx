@@ -29,7 +29,7 @@ const Footer: React.FC<FooterProps> = ({ onShowTerms, onShowHowItWorks, onShowAp
             <h4 className="font-semibold text-lg mb-4">Contact Us</h4>
             <ul className="space-y-2 text-gray-400">
               <li>Email: aalendingservices@gmail.com</li>
-              <li>Phone: +63 995 867 7160</li>
+              <li>Phone: +63 915 820 3127</li>
               <li>Address: Magsaysay St, Sorsogon City, Sorsogon</li>
             </ul>
           </div>

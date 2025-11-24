@@ -10,6 +10,7 @@ import Feedback from './components/Feedback';
 import Footer from './components/Footer';
 import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
+import PaymentForm from './components/PaymentForm';
 
 function App() {
   const [page, setPage] = useState('main');
@@ -25,6 +26,8 @@ function App() {
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
   const showApplicationForm = () => setPage('application');
+  const showPaymentForm = () => setPage('payment');
+  
   const showMain = () => {
     setPage('main');
     // Clean URL param if exists
@@ -67,6 +70,10 @@ function App() {
     return <LoanApplicationForm onBack={showMain} />;
   }
 
+  if (page === 'payment') {
+    return <PaymentForm onBack={showMain} />;
+  }
+
   return (
     <div className="App bg-gray-100 font-sans">
       <Header
@@ -76,7 +83,10 @@ function App() {
         onGoToAdmin={goToAdmin}
       />
       <main>
-        <Hero onShowApplicationForm={showApplicationForm} />
+        <Hero 
+          onShowApplicationForm={showApplicationForm} 
+          onShowPaymentForm={showPaymentForm}
+        />
         <LoanOptions />
         <Requirements onShowApplicationForm={showApplicationForm} />
         <FAQ />
