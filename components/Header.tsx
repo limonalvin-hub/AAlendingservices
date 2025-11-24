@@ -4,14 +4,12 @@ interface HeaderProps {
   onShowHowItWorks: () => void;
   onShowApplicationForm: () => void;
   onShowMainAndScroll: (sectionId: string) => void;
-  onGoToAdmin: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
   onShowHowItWorks, 
   onShowApplicationForm, 
   onShowMainAndScroll, 
-  onGoToAdmin 
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -37,7 +35,6 @@ const Header: React.FC<HeaderProps> = ({
         </div>
         
         <nav className="hidden md:flex items-center space-x-6">
-          <button onClick={onGoToAdmin} className="text-gray-600 hover:text-brand-blue transition font-medium">Admin Login</button>
           <button onClick={onShowHowItWorks} className="text-gray-600 hover:text-brand-blue transition">How It Works</button>
           <button onClick={onShowApplicationForm} className="text-gray-600 hover:text-brand-blue transition">Application Form</button>
           <button onClick={() => onShowMainAndScroll('apply')} className="text-gray-600 hover:text-brand-blue transition">Requirements</button>
@@ -55,7 +52,6 @@ const Header: React.FC<HeaderProps> = ({
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white shadow-lg absolute top-full left-0 w-full border-t border-gray-100">
           <nav className="flex flex-col items-center space-y-2 py-6 px-4">
-            <button onClick={() => handleMobileLinkClick(onGoToAdmin)} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">Admin Login</button>
             <button onClick={() => handleMobileLinkClick(onShowHowItWorks)} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">How It Works</button>
             <button onClick={() => handleMobileLinkClick(onShowApplicationForm)} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">Application Form</button>
             <button onClick={() => handleMobileScrollClick('apply')} className="text-gray-600 hover:text-brand-blue transition w-full py-3 text-lg font-medium border-b border-gray-50">Requirements</button>

@@ -13,10 +13,22 @@ import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
 
 function App() {
-  const [page, setPage] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('page') === 'admin' ? 'admin' : 'main';
+  // --- ISOLATED ADMIN ROUTE LOGIC ---
+  const [isAdminPortal, setIsAdminPortal] = useState(() => {
+    return window.location.hash === '#/portal/admin-access';
   });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setIsAdminPortal(window.location.hash === '#/portal/admin-access');
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // --- STUDENT INTERFACE STATE ---
+  const [page, setPage] = useState('main');
 
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
@@ -25,12 +37,7 @@ function App() {
   
   const showMain = () => {
     setPage('main');
-    // Clear the URL param if going back to main to keep URL clean
-    const url = new URL(window.location.href);
-    if (url.searchParams.get('page') === 'admin') {
-      url.searchParams.delete('page');
-      window.history.pushState({}, '', url);
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const showMainAndScroll = (sectionId: string) => {
@@ -43,16 +50,23 @@ function App() {
     }, 100);
   };
 
-  const goToAdmin = () => {
-    setPage('admin');
-  };
-
-  // --- ROUTING LOGIC ---
-
-  if (page === 'admin') {
-    return <AdminPanel onBack={showMain} />;
+  // --- BRANCH 1: HIDDEN ADMIN PORTAL ---
+  // This is completely isolated from the Student UI and Maintenance Middleware
+  if (isAdminPortal) {
+    return (
+      <AdminPanel 
+        onBack={() => {
+          // "Back" for admin means exiting the portal
+          window.location.hash = '';
+          setPage('main');
+        }} 
+      />
+    );
   }
 
+  // --- BRANCH 2: STUDENT INTERFACE ---
+  // Future Maintenance Mode middleware should wrap this return block ONLY.
+  
   if (page === 'terms') {
     return <TermsAndConditions onBack={showMain} />;
   }
@@ -75,7 +89,6 @@ function App() {
         onShowHowItWorks={showHowItWorks}
         onShowApplicationForm={showApplicationForm}
         onShowMainAndScroll={showMainAndScroll}
-        onGoToAdmin={goToAdmin}
       />
       <main>
         <Hero 
