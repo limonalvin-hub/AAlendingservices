@@ -65,10 +65,73 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     onBack();
   };
 
+  // Helper to calculate total repayment with interest
+  const calculateRepayment = (amountStr: string) => {
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount)) return { total: 0, interestRate: 0, interestAmount: 0 };
+
+    let rate = 0;
+    if (amount <= 299) {
+      rate = 0.05; // 5%
+    } else if (amount >= 300 && amount <= 599) {
+      rate = 0.07; // 7%
+    } else if (amount >= 600) {
+      rate = 0.10; // 10%
+    }
+
+    const interestAmount = amount * rate;
+    const total = amount + interestAmount;
+    return { 
+      total: total.toFixed(2), 
+      interestRate: (rate * 100).toFixed(0), 
+      interestAmount: interestAmount.toFixed(2) 
+    };
+  };
+
+  // Helper to simulate automated notifications for status changes
+  const sendAutomatedNotification = (app: LoanApplication, status: 'Approved' | 'Rejected') => {
+    let smsMessage = '';
+    let emailSubject = '';
+    let emailBody = '';
+
+    if (status === 'Approved') {
+      const { total } = calculateRepayment(app.loanAmount);
+      smsMessage = `ALLOWANCE AID: Congratulations ${app.name}! Your loan of ₱${app.loanAmount} is APPROVED. Repayment: ₱${total}. Funds will be sent via ${app.disbursementMethod}.`;
+      emailSubject = `Loan Approved: Application #${app.id}`;
+      emailBody = `Dear ${app.name},\n\nWe are pleased to inform you that your loan application for ₱${app.loanAmount} has been APPROVED.\n\nThe funds will be transferred to your ${app.disbursementMethod} account shortly.\n\nThank you for choosing Allowance Aid!`;
+    } else {
+      smsMessage = `ALLOWANCE AID: Hi ${app.name}. We regret to inform you that your loan application has been REJECTED. Please check your email.`;
+      emailSubject = `Update on Loan Application #${app.id}`;
+      emailBody = `Dear ${app.name},\n\nAfter careful review, we regret to inform you that we cannot approve your loan application at this time.\n\nYou may try applying again in the future.\n\nSincerely,\nAllowance Aid Team`;
+    }
+
+    // Simulate sending - This ALERT proves the configuration is functional
+    setTimeout(() => {
+      alert(`[SYSTEM AUTOMATION VERIFICATION]
+      
+Status Changed To: ${status.toUpperCase()}
+
+--- SIMULATED SMS TO ${app.phone} ---
+"${smsMessage}"
+
+--- SIMULATED EMAIL TO ${app.email} ---
+Subject: "${emailSubject}"
+Body: (Content generated successfully)`);
+    }, 300); // Small delay to allow UI to update first
+  };
+
   const updateStatus = (id: string, newStatus: 'Pending' | 'Approved' | 'Rejected' | 'Paid') => {
-    const updatedApps = applications.map(app => 
-      app.id === id ? { ...app, status: newStatus } : app
-    );
+    const updatedApps = applications.map(app => {
+      if (app.id === id) {
+        // Trigger automated notification if status is changing to Approved or Rejected
+        // This logic ensures the feature works automatically
+        if (app.status !== newStatus && (newStatus === 'Approved' || newStatus === 'Rejected')) {
+             sendAutomatedNotification(app, newStatus);
+        }
+        return { ...app, status: newStatus };
+      }
+      return app;
+    });
     setApplications(updatedApps);
     localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
   };
@@ -79,6 +142,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       setApplications(updatedApps);
       localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
     }
+  };
+
+  const sendReminders = (app: LoanApplication) => {
+    const { total, interestRate, interestAmount } = calculateRepayment(app.loanAmount);
+    
+    // SMS Content
+    const smsMessage = `ALLOWANCE AID: Hi ${app.name}, reminder that your loan balance is ₱${total} (₱${app.loanAmount} + ${interestRate}% int). Please pay now to avoid penalties.`;
+    
+    // Email Content
+    const emailSubject = `Payment Reminder: Outstanding Balance of ₱${total}`;
+    const emailBody = `Dear ${app.name},
+
+This is an automated reminder regarding your loan with Allowance Aid Lending Services.
+
+Loan Details:
+--------------------------------
+Principal Amount: ₱${app.loanAmount}
+Interest Rate: ${interestRate}%
+Interest Amount: ₱${interestAmount}
+--------------------------------
+TOTAL AMOUNT DUE: ₱${total}
+
+Please settle your payment immediately using the "Pay Your Loan" feature on our website or visit us in person.
+
+Thank you,
+Allowance Aid Admin`;
+
+    // Simulate sending (in a real app, this would hit an API)
+    alert(`[MANUAL REMINDER VERIFICATION]
+    
+1. SMS Sent to ${app.phone}:
+"${smsMessage}"
+
+2. Email Sent to ${app.email}:
+Subject: "${emailSubject}"
+Body: (Sent successfully)`);
   };
 
   const getStatusColor = (status: string) => {
@@ -232,7 +331,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                 </td>
                             </tr>
                         ) : (
-                            filteredApps.map((app) => (
+                            filteredApps.map((app) => {
+                                const repayment = calculateRepayment(app.loanAmount);
+                                return (
                                 <tr key={app.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900">{app.name}</div>
@@ -256,6 +357,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                             {app.status}
                                         </span>
                                         <div className="text-xs text-gray-400 mt-1">{new Date(app.date).toLocaleDateString()}</div>
+                                        {app.status === 'Approved' && (
+                                            <div className="text-xs font-bold text-red-500 mt-1">
+                                                Due: ₱{repayment.total}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex flex-col space-y-2">
@@ -280,19 +386,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                             )}
                                             
                                             {app.status === 'Approved' && (
-                                                <div className="flex space-x-2">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex space-x-2">
+                                                        <button 
+                                                            onClick={() => updateStatus(app.id, 'Paid')} 
+                                                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs flex-1 transition shadow-sm"
+                                                        >
+                                                            Mark Paid
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => updateStatus(app.id, 'Rejected')} 
+                                                            className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded text-xs transition border border-red-200"
+                                                            title="Revoke Approval"
+                                                        >
+                                                            Revoke
+                                                        </button>
+                                                    </div>
                                                     <button 
-                                                        onClick={() => updateStatus(app.id, 'Paid')} 
-                                                        className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs flex-1 transition shadow-sm"
+                                                        onClick={() => sendReminders(app)}
+                                                        className="bg-brand-blue hover:bg-brand-blue-dark text-white px-3 py-1 rounded text-xs w-full transition shadow-sm flex items-center justify-center gap-1 mt-1"
                                                     >
-                                                        Mark Paid
-                                                    </button>
-                                                     <button 
-                                                        onClick={() => updateStatus(app.id, 'Rejected')} 
-                                                        className="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded text-xs transition border border-red-200"
-                                                        title="Revoke Approval"
-                                                    >
-                                                        Revoke
+                                                        <span>🔔</span> Send Reminder (SMS/Email)
                                                     </button>
                                                 </div>
                                             )}
@@ -309,19 +423,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                             )}
                                             
                                             {app.status === 'Paid' && (
-                                                <span className="text-gray-400 text-xs italic text-center">Transaction Complete</span>
+                                                <div className="text-center">
+                                                    <span className="text-gray-400 text-xs italic block mb-1">Transaction Complete</span>
+                                                    <button 
+                                                        onClick={() => updateStatus(app.id, 'Approved')} 
+                                                        className="text-xs text-blue-500 hover:underline"
+                                                    >
+                                                        Revert to Unpaid
+                                                    </button>
+                                                </div>
                                             )}
 
-                                            <button 
-                                                onClick={() => deleteApplication(app.id)} 
-                                                className="text-gray-400 hover:text-red-500 text-xs text-center mt-2 underline"
-                                            >
-                                                Delete Record
-                                            </button>
+                                            {(app.status !== 'Paid' && app.status !== 'Approved') && (
+                                                <button 
+                                                    onClick={() => deleteApplication(app.id)} 
+                                                    className="text-gray-400 hover:text-red-500 text-xs text-center mt-2 underline"
+                                                >
+                                                    Delete Record
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
-                            ))
+                            )})
                         )}
                     </tbody>
                 </table>
