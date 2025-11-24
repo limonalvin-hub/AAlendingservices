@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -11,37 +12,33 @@ import Footer from './components/Footer';
 import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
+import MaintenancePage from './components/MaintenancePage';
+import { MAINTENANCE_MODE } from './constants';
 
 function App() {
   // --- ISOLATED ADMIN ROUTE LOGIC ---
+  // HIDDEN DOOR: Only accessible via specific hash, bypasses maintenance mode
   const [isAdminPortal, setIsAdminPortal] = useState(() => {
-    return window.location.hash === '#/portal/admin-access';
+    return window.location.hash === '#/secure-admin-login';
   });
+
+  // Standard App Navigation State
+  const [currentView, setCurrentView] = useState('hero'); 
 
   useEffect(() => {
     const handleHashChange = () => {
-      setIsAdminPortal(window.location.hash === '#/portal/admin-access');
+      setIsAdminPortal(window.location.hash === '#/secure-admin-login');
     };
 
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
   }, []);
 
-  // --- STUDENT INTERFACE STATE ---
-  const [page, setPage] = useState('main');
-
-  const showTerms = () => setPage('terms');
-  const showHowItWorks = () => setPage('how');
-  const showApplicationForm = () => setPage('application');
-  const showPaymentForm = () => setPage('payment');
-  
-  const showMain = () => {
-    setPage('main');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const showMainAndScroll = (sectionId: string) => {
-    setPage('main');
+    setCurrentView('hero');
+    // Small timeout to allow DOM to update if we were on a different view
     setTimeout(() => {
       const element = document.getElementById(sectionId);
       if (element) {
@@ -50,62 +47,57 @@ function App() {
     }, 100);
   };
 
-  // --- BRANCH 1: HIDDEN ADMIN PORTAL ---
-  // This is completely isolated from the Student UI and Maintenance Middleware
-  if (isAdminPortal) {
-    return (
-      <AdminPanel 
-        onBack={() => {
-          // "Back" for admin means exiting the portal
-          window.location.hash = '';
-          setPage('main');
-        }} 
-      />
-    );
-  }
-
-  // --- BRANCH 2: STUDENT INTERFACE ---
-  // Future Maintenance Mode middleware should wrap this return block ONLY.
+  // --- PRIORITY RENDERING SYSTEM ---
   
-  if (page === 'terms') {
-    return <TermsAndConditions onBack={showMain} />;
+  // LEVEL 1: ADMIN PORTAL (Highest Priority - Bypasses everything)
+  if (isAdminPortal) {
+    return <AdminPanel onBack={() => {
+      window.location.hash = ''; // Clear hash to exit secure mode
+      setCurrentView('hero');
+    }} />;
   }
 
-  if (page === 'how') {
-    return <HowItWorks onBack={showMain} />;
+  // LEVEL 2: MAINTENANCE MODE (Blocks regular users)
+  if (MAINTENANCE_MODE) {
+    return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 
-  if (page === 'application') {
-    return <LoanApplicationForm onBack={showMain} />;
-  }
-
-  if (page === 'payment') {
-    return <PaymentForm onBack={showMain} />;
-  }
-
+  // LEVEL 3: STUDENT APP (Standard Access)
   return (
-    <div className="App bg-gray-100 font-sans">
-      <Header
-        onShowHowItWorks={showHowItWorks}
-        onShowApplicationForm={showApplicationForm}
-        onShowMainAndScroll={showMainAndScroll}
-      />
-      <main>
-        <Hero 
-          onShowApplicationForm={showApplicationForm} 
-          onShowPaymentForm={showPaymentForm}
-        />
-        <LoanOptions />
-        <Requirements onShowApplicationForm={showApplicationForm} />
-        <FAQ />
-        <Feedback />
-      </main>
-      <Footer
-        onShowTerms={showTerms}
-        onShowHowItWorks={showHowItWorks}
-        onShowApplicationForm={showApplicationForm}
-        onShowMainAndScroll={showMainAndScroll}
-      />
+    <div className="font-sans text-gray-800">
+      {currentView === 'terms' ? (
+        <TermsAndConditions onBack={() => setCurrentView('hero')} />
+      ) : currentView === 'howItWorks' ? (
+        <HowItWorks onBack={() => setCurrentView('hero')} />
+      ) : currentView === 'application' ? (
+        <LoanApplicationForm onBack={() => setCurrentView('hero')} />
+      ) : currentView === 'payment' ? (
+        <PaymentForm onBack={() => setCurrentView('hero')} />
+      ) : (
+        <>
+          <Header 
+            onShowHowItWorks={() => setCurrentView('howItWorks')}
+            onShowApplicationForm={() => setCurrentView('application')}
+            onShowMainAndScroll={showMainAndScroll}
+          />
+          <main>
+            <Hero 
+              onShowApplicationForm={() => setCurrentView('application')} 
+              onShowPaymentForm={() => setCurrentView('payment')}
+            />
+            <LoanOptions />
+            <Requirements onShowApplicationForm={() => setCurrentView('application')} />
+            <Feedback />
+            <FAQ />
+          </main>
+          <Footer 
+            onShowTerms={() => setCurrentView('terms')}
+            onShowHowItWorks={() => setCurrentView('howItWorks')}
+            onShowApplicationForm={() => setCurrentView('application')}
+            onShowMainAndScroll={showMainAndScroll}
+          />
+        </>
+      )}
     </div>
   );
 }
