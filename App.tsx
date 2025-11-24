@@ -11,74 +11,12 @@ import Footer from './components/Footer';
 import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
-import MaintenancePage from './components/MaintenancePage';
 
 function App() {
-  // --- EMERGENCY RESCUE PARAMETER ---
-  // Check this BEFORE any other logic to allow immediate override
-  // Usage: /?rescue_admin=true
-  const searchParams = new URLSearchParams(window.location.search);
-  const isRescueMode = searchParams.get('rescue_admin') === 'true';
-
-  // --- STATE INITIALIZATION (SYNCHRONOUS) ---
-  // Critical: Read storage immediately to prevent "flash" of incorrect state/content
-  // and ensure Gatekeeper has data before first render.
-
-  // 1. Navigation State
   const [page, setPage] = useState(() => {
-    // If rescue mode is active, force navigation to Admin Panel immediately
-    if (isRescueMode) return 'admin';
-    return searchParams.get('page') === 'admin' ? 'admin' : 'main';
-  });
-
-  // 2. Maintenance Status
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(() => {
-    return localStorage.getItem('maintenance_mode') === 'true';
-  });
-
-  // 3. Admin Session
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return sessionStorage.getItem('adminAuth') === 'true';
-  });
-
-  // --- MIDDLEWARE: ROUTE WHITELISTING ---
-  // Checks if the current URL is explicitly allowed to bypass Maintenance Mode.
-  const isWhitelisted = () => {
     const params = new URLSearchParams(window.location.search);
-    const currentPath = window.location.pathname;
-    const currentHash = window.location.hash;
-
-    // 1. Allow Admin Query Parameter (Current Architecture)
-    if (params.get('page') === 'admin') return true;
-
-    // 2. Allow Explicit Admin Paths (Future-proofing/Server-side routing)
-    // CRITICAL FIX: Whitelist specific paths to prevent lockout
-    const explicitlyAllowedRoutes = ['/admin', '/login'];
-    
-    // Check strict path starts
-    if (explicitlyAllowedRoutes.some(route => currentPath.startsWith(route))) {
-      return true;
-    }
-
-    // Check hash based routing (e.g. #/admin) often used in react apps
-    if (explicitlyAllowedRoutes.some(route => currentHash.includes(route))) {
-      return true;
-    }
-
-    return false;
-  };
-
-  useEffect(() => {
-    // Listener for cross-tab synchronization
-    // If Admin toggles maintenance in one tab, others update instantly.
-    const handleStorageChange = () => {
-      setIsMaintenanceMode(localStorage.getItem('maintenance_mode') === 'true');
-      setIsAdminLoggedIn(sessionStorage.getItem('adminAuth') === 'true');
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    return params.get('page') === 'admin' ? 'admin' : 'main';
+  });
 
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
@@ -91,11 +29,6 @@ function App() {
     const url = new URL(window.location.href);
     if (url.searchParams.get('page') === 'admin') {
       url.searchParams.delete('page');
-      window.history.pushState({}, '', url);
-    }
-    // Also clear rescue param if it exists so user returns to normal flow
-    if (url.searchParams.get('rescue_admin') === 'true') {
-      url.searchParams.delete('rescue_admin');
       window.history.pushState({}, '', url);
     }
   };
@@ -113,24 +46,6 @@ function App() {
   const goToAdmin = () => {
     setPage('admin');
   };
-
-  const handleRefresh = () => {
-    window.location.reload();
-  };
-
-  // --- THE GATEKEEPER ---
-  // Logic:
-  // 1. Is Rescue Mode Active? (First Priority - Bypass EVERYTHING)
-  // 2. Is Maintenance Mode Active?
-  // 3. Is the Route Whitelisted? (Bypass if true)
-  // 4. Is the User an Admin? (Bypass if true)
-  
-  const isWhitelistedRoute = isWhitelisted(); // Check URL
-  const shouldBlockAccess = !isRescueMode && isMaintenanceMode && !isWhitelistedRoute && !isAdminLoggedIn;
-
-  if (shouldBlockAccess) {
-    return <MaintenancePage onRefresh={handleRefresh} />;
-  }
 
   // --- ROUTING LOGIC ---
 
@@ -161,7 +76,6 @@ function App() {
         onShowApplicationForm={showApplicationForm}
         onShowMainAndScroll={showMainAndScroll}
         onGoToAdmin={goToAdmin}
-        isMaintenanceMode={isMaintenanceMode}
       />
       <main>
         <Hero 
