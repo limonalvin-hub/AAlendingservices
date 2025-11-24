@@ -15,20 +15,28 @@ import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
 
 function App() {
-  // --- ISOLATED ADMIN ROUTE LOGIC ---
-  // HIDDEN DOOR: Only accessible via specific hash, bypasses maintenance mode
-  const [isAdminPortal, setIsAdminPortal] = useState(() => {
-    return window.location.hash === '#/secure-admin-login';
-  });
-
+  // --- GLOBAL GUARD STATE ---
+  const [isAdminPortal, setIsAdminPortal] = useState(false);
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
+  
   // Standard App Navigation State
   const [currentView, setCurrentView] = useState('hero'); 
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
 
+  // --- PRIORITY A: ADMIN WHITELIST CHECK ---
+  // Listens for hash changes to grant immunity regardless of query params (fbclid)
   useEffect(() => {
-    const handleHashChange = () => {
-      const isSecure = window.location.hash === '#/secure-admin-login';
+    const checkAdminHash = () => {
+      // Robust check: .includes allows for potential trailing slashes or params after hash
+      const isSecure = window.location.hash.includes('secure-admin-login');
       setIsAdminPortal(isSecure);
+      return isSecure;
+    };
+
+    // Check on mount
+    const initialAdminState = checkAdminHash();
+
+    const handleHashChange = () => {
+      checkAdminHash();
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -37,31 +45,42 @@ function App() {
     };
   }, []);
 
-  // --- REAL-TIME MAINTENANCE LISTENER ---
-  // Listens for global system status changes
+  // --- PRIORITY B: REAL-TIME MAINTENANCE LOCKDOWN ---
+  // Polls the "database" (localStorage) to lock the app instantly if not admin
   useEffect(() => {
     const checkSystemStatus = () => {
-      // In a real production app, this would be an API call or WebSocket listener
+      // If we are already in the Admin Portal, we ignore maintenance checks completely
+      // This prevents the maintenance screen from flashing even for a millisecond
+      if (window.location.hash.includes('secure-admin-login')) {
+        setIsMaintenanceMode(false);
+        return;
+      }
+
       const maintenanceActive = localStorage.getItem('allowance_aid_maintenance_mode') === 'true';
       
       // LOGIC: If maintenance is ON and we are NOT in the admin portal, lock the app.
-      // We do NOT handle the revert to 'false' here. We keep MaintenancePage mounted
-      // so it can handle the "Hard Reload" recovery strategy itself.
-      if (maintenanceActive && !isAdminPortal) {
+      if (maintenanceActive) {
         setIsMaintenanceMode(true);
+      } else {
+        // Optional: If we want the App wrapper to handle "unlocking" without a hard reload,
+        // we can set this to false. However, MaintenancePage handles the "Hard Reload" 
+        // strategy for cache busting, so usually we let MaintenancePage handle the exit.
+        // But for development fluidity, we allow state to toggle back if needed.
+        setIsMaintenanceMode(false);
       }
     };
 
-    // Check immediately and then poll
+    // Check immediately
     checkSystemStatus();
+
+    // Poll every 1 second (Simulates Real-Time Database Subscription)
     const interval = setInterval(checkSystemStatus, 1000);
 
     return () => clearInterval(interval);
-  }, [isAdminPortal]); // Re-run check if admin status changes
+  }, [isAdminPortal]); // Re-run if admin status changes
 
   const showMainAndScroll = (sectionId: string) => {
     setCurrentView('hero');
-    // Small timeout to allow DOM to update if we were on a different view
     setTimeout(() => {
       const element = document.getElementById(sectionId);
       if (element) {
@@ -70,26 +89,26 @@ function App() {
     }, 100);
   };
 
-  // --- PRIORITY RENDERING SYSTEM ---
+  // --- RENDER LOGIC FLOW ---
   
-  // LEVEL 1: ADMIN PORTAL (Highest Priority - Bypasses everything)
+  // 1. ADMIN IMMUNITY (Top Priority)
+  // Even if maintenance is TRUE, if isAdminPortal is TRUE, we render AdminPanel.
   if (isAdminPortal) {
     return <AdminPanel onBack={() => {
-      window.location.hash = ''; // Clear hash to exit secure mode
+      // When exiting admin, clear hash. 
+      // The useEffects will trigger and likely dump user into MaintenancePage if active.
+      window.location.hash = ''; 
       setCurrentView('hero');
-      // Re-check maintenance on exit
-      if (localStorage.getItem('allowance_aid_maintenance_mode') === 'true') {
-        setIsMaintenanceMode(true);
-      }
     }} />;
   }
 
-  // LEVEL 2: MAINTENANCE MODE (Blocks regular users)
+  // 2. MAINTENANCE LOCKDOWN
+  // If not admin, and maintenance is ON, block access.
   if (isMaintenanceMode) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 
-  // LEVEL 3: STUDENT APP (Standard Access)
+  // 3. MAIN STUDENT APP (Standard Access)
   return (
     <div className="font-sans text-gray-800">
       {currentView === 'terms' ? (
