@@ -16,10 +16,13 @@ import MaintenancePage from './components/MaintenancePage';
 import { MAINTENANCE_MODE } from './constants';
 
 function App() {
-  // --- ISOLATED ADMIN ROUTE LOGIC ---
-  // HIDDEN DOOR: Only accessible via specific hash, bypasses maintenance mode
+  // --- "HASH-AWARE" GUARD (SAFE ZONE) ---
+  // CRITICAL: This logic MUST run before any maintenance checks.
+  // It whitelists the specific admin hash to prevent lockout.
+  const ADMIN_HASH_ROUTE = '#/secure-admin-login';
+  
   const [isAdminPortal, setIsAdminPortal] = useState(() => {
-    return window.location.hash === '#/secure-admin-login';
+    return window.location.hash === ADMIN_HASH_ROUTE;
   });
 
   // Standard App Navigation State
@@ -27,7 +30,9 @@ function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setIsAdminPortal(window.location.hash === '#/secure-admin-login');
+      // Real-time check for the Safe Zone URL
+      const isSafeZone = window.location.hash === ADMIN_HASH_ROUTE;
+      setIsAdminPortal(isSafeZone);
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -49,7 +54,7 @@ function App() {
 
   // --- PRIORITY RENDERING SYSTEM ---
   
-  // LEVEL 1: ADMIN PORTAL (Highest Priority - Bypasses everything)
+  // LEVEL 1: ADMIN PORTAL (Safe Zone - Exempt from Maintenance)
   if (isAdminPortal) {
     return <AdminPanel onBack={() => {
       window.location.hash = ''; // Clear hash to exit secure mode
@@ -57,12 +62,12 @@ function App() {
     }} />;
   }
 
-  // LEVEL 2: MAINTENANCE MODE (Blocks regular users)
+  // LEVEL 2: SYSTEM MAINTENANCE MODE (Blocks all non-admin traffic)
   if (MAINTENANCE_MODE) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 
-  // LEVEL 3: STUDENT APP (Standard Access)
+  // LEVEL 3: REGULAR STUDENT APP (Business as usual)
   return (
     <div className="font-sans text-gray-800">
       {currentView === 'terms' ? (
