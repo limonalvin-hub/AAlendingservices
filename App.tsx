@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import HowItWorks from './components/HowItWorks';
@@ -14,54 +14,63 @@ import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
 
 function App() {
-  const [page, setPage] = useState('main');
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  // --- STRICT SYSTEM GUARD: SYNCHRONOUS INITIALIZATION ---
+  // We initialize state lazily to check localStorage BEFORE the first render.
+  // This simulates a "Server-Side" block because the unauthorized view is never mounted to the DOM.
 
-  // --- STRICT SYSTEM GUARD ---
-  // Real-time System Check using Polling
-  // This simulates a websocket or server-push notification.
-  // It ensures that even without a page refresh, a user is "thrown out" 
-  // if maintenance is toggled on the backend.
+  const [page, setPage] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    // Explicitly check URL params during init to prevent "flash" of main content
+    return params.get('page') === 'admin' ? 'admin' : 'main';
+  });
+
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState(() => {
+    return localStorage.getItem('maintenance_mode') === 'true';
+  });
+
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return sessionStorage.getItem('adminAuth') === 'true';
+  });
+
+  // --- UNIVERSAL BROWSER ENFORCEMENT ---
+  const checkSystemStatus = useCallback(() => {
+    // 1. Check Global Maintenance Status
+    const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
+    
+    // 2. Check Admin Session Validity
+    const adminSession = sessionStorage.getItem('adminAuth') === 'true';
+    
+    // Only update if changed to avoid unnecessary re-renders
+    setIsMaintenanceMode(maintenanceStatus);
+    setIsAdminLoggedIn(adminSession);
+  }, []);
+
   useEffect(() => {
-    const checkSystemStatus = () => {
-      // 1. Check Global Maintenance Status
-      // In a real app, this would be an API call like await fetch('/api/status')
-      const maintenanceStatus = localStorage.getItem('maintenance_mode') === 'true';
-      
-      // 2. Check Admin Session Validity
-      const adminSession = sessionStorage.getItem('adminAuth') === 'true';
-      
-      setIsMaintenanceMode(maintenanceStatus);
-      setIsAdminLoggedIn(adminSession);
-
-      // Force Logout / Session Invalidation Logic
-      // If maintenance is ON, and user is NOT admin, and currently viewing a protected page,
-      // we don't just redirect, we can also choose to clear temporary session data here if needed.
-    };
-
     // Initial Check
     checkSystemStatus();
 
-    // Continuous Polling (Every 500ms) 
-    // This high-frequency check ensures "Immediate" restriction across tabs/windows.
+    // 1. Polling (Fall-back for standard browsers)
     const intervalId = setInterval(checkSystemStatus, 500);
 
-    return () => clearInterval(intervalId);
-  }, []);
+    // 2. Storage Event (Cross-Tab Sync)
+    // If admin toggles maintenance in one tab, all other tabs update instantly.
+    window.addEventListener('storage', checkSystemStatus);
 
-  // Handle URL Routing & Admin Direct Access
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    
-    // CRITICAL: Admin Exception
-    // We allow the router to set the page to 'admin' if the URL parameter exists.
-    // The actual authentication check happens inside the AdminPanel component
-    // or the guard clause below.
-    if (params.get('page') === 'admin') {
-      setPage('admin');
-    }
-  }, []);
+    // 3. Visibility Change (App Switching)
+    // Critical for Mobile: User switches to Facebook/Messenger then back to Chrome/Safari.
+    document.addEventListener('visibilitychange', checkSystemStatus);
+
+    // 4. PageShow Event (BFCache / History Navigation)
+    // Critical for Safari/iOS: Ensures logic runs even when hitting "Back" button from cache.
+    window.addEventListener('pageshow', checkSystemStatus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('storage', checkSystemStatus);
+      document.removeEventListener('visibilitychange', checkSystemStatus);
+      window.removeEventListener('pageshow', checkSystemStatus);
+    };
+  }, [checkSystemStatus]);
 
   const showTerms = () => setPage('terms');
   const showHowItWorks = () => setPage('how');
@@ -101,8 +110,9 @@ function App() {
   // --- GUARD CLAUSE: THE THROWOUT ---
   // 1. IF Maintenance is ON
   // 2. AND User is NOT an Authenticated Admin
-  // 3. AND User is NOT attempting to reach the admin portal explicitly
-  // -> THEN: Render Maintenance Page (Blocking all other components)
+  // 3. AND User is NOT currently on the admin login page
+  // -> THEN: Render Maintenance Page immediately.
+  // This return statement prevents the main app tree from ever mounting.
   if (isMaintenanceMode && !isAdminLoggedIn && page !== 'admin') {
     return <MaintenancePage onRefresh={handleRefresh} />;
   }
