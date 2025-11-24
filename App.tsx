@@ -13,24 +13,13 @@ import TermsAndConditions from './components/TermsAndConditions';
 import AdminPanel from './components/AdminPanel';
 import PaymentForm from './components/PaymentForm';
 import MaintenancePage from './components/MaintenancePage';
-import { MAINTENANCE_MODE as DEFAULT_MAINTENANCE_MODE } from './constants';
+import { MAINTENANCE_MODE } from './constants';
 
 function App() {
-  // --- "HASH-AWARE" GUARD (SAFE ZONE) ---
-  const ADMIN_HASH_ROUTE = '#/secure-admin-login';
-  
+  // --- ISOLATED ADMIN ROUTE LOGIC ---
+  // HIDDEN DOOR: Only accessible via specific hash, bypasses maintenance mode
   const [isAdminPortal, setIsAdminPortal] = useState(() => {
-    return window.location.hash === ADMIN_HASH_ROUTE;
-  });
-
-  // --- DYNAMIC MAINTENANCE STATE ---
-  // We prioritize LocalStorage (set by Admin) over the constant file
-  const [isSystemMaintenance, setIsSystemMaintenance] = useState(() => {
-    const stored = localStorage.getItem('SYSTEM_MAINTENANCE_ACTIVE');
-    if (stored !== null) {
-      return JSON.parse(stored);
-    }
-    return DEFAULT_MAINTENANCE_MODE;
+    return window.location.hash === '#/secure-admin-login';
   });
 
   // Standard App Navigation State
@@ -38,9 +27,7 @@ function App() {
 
   useEffect(() => {
     const handleHashChange = () => {
-      // Real-time check for the Safe Zone URL
-      const isSafeZone = window.location.hash === ADMIN_HASH_ROUTE;
-      setIsAdminPortal(isSafeZone);
+      setIsAdminPortal(window.location.hash === '#/secure-admin-login');
     };
 
     window.addEventListener('hashchange', handleHashChange);
@@ -60,33 +47,22 @@ function App() {
     }, 100);
   };
 
-  const handleMaintenanceToggle = (isActive: boolean) => {
-    setIsSystemMaintenance(isActive);
-    localStorage.setItem('SYSTEM_MAINTENANCE_ACTIVE', JSON.stringify(isActive));
-  };
-
   // --- PRIORITY RENDERING SYSTEM ---
   
-  // LEVEL 1: ADMIN PORTAL (Safe Zone - Exempt from Maintenance)
+  // LEVEL 1: ADMIN PORTAL (Highest Priority - Bypasses everything)
   if (isAdminPortal) {
-    return (
-      <AdminPanel 
-        onBack={() => {
-          window.location.hash = ''; // Clear hash to exit secure mode
-          setCurrentView('hero');
-        }}
-        isMaintenanceMode={isSystemMaintenance}
-        onToggleMaintenance={handleMaintenanceToggle}
-      />
-    );
+    return <AdminPanel onBack={() => {
+      window.location.hash = ''; // Clear hash to exit secure mode
+      setCurrentView('hero');
+    }} />;
   }
 
-  // LEVEL 2: SYSTEM MAINTENANCE MODE (Blocks all non-admin traffic)
-  if (isSystemMaintenance) {
+  // LEVEL 2: MAINTENANCE MODE (Blocks regular users)
+  if (MAINTENANCE_MODE) {
     return <MaintenancePage onRefresh={() => window.location.reload()} />;
   }
 
-  // LEVEL 3: REGULAR STUDENT APP (Business as usual)
+  // LEVEL 3: STUDENT APP (Standard Access)
   return (
     <div className="font-sans text-gray-800">
       {currentView === 'terms' ? (
