@@ -46,13 +46,24 @@ function App() {
   const isWhitelisted = () => {
     const params = new URLSearchParams(window.location.search);
     const currentPath = window.location.pathname;
+    const currentHash = window.location.hash;
 
     // 1. Allow Admin Query Parameter (Current Architecture)
     if (params.get('page') === 'admin') return true;
 
     // 2. Allow Explicit Admin Paths (Future-proofing/Server-side routing)
-    if (currentPath.startsWith('/admin')) return true;
-    if (currentPath.startsWith('/login')) return true;
+    // CRITICAL FIX: Whitelist specific paths to prevent lockout
+    const explicitlyAllowedRoutes = ['/admin', '/login'];
+    
+    // Check strict path starts
+    if (explicitlyAllowedRoutes.some(route => currentPath.startsWith(route))) {
+      return true;
+    }
+
+    // Check hash based routing (e.g. #/admin) often used in react apps
+    if (explicitlyAllowedRoutes.some(route => currentHash.includes(route))) {
+      return true;
+    }
 
     return false;
   };
