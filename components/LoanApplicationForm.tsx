@@ -1,7 +1,7 @@
-
 import React, { useState, FormEvent, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
+import emailjs from '@emailjs/browser';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -219,7 +219,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     setIsSubmitting(true);
 
-    // --- FIREBASE FIRESTORE SUBMISSION ---
+    // --- 1. FIREBASE DB SUBMISSION (Action B) ---
     try {
       const newApplication = {
         date: new Date().toISOString(),
@@ -241,11 +241,37 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       await addDoc(collection(db, "applications"), newApplication);
       console.log("Document successfully written to Firestore!");
+      
+      // --- 2. EMAIL NOTIFICATION (Action A) ---
+      // NOTE: You must replace 'YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', 'YOUR_PUBLIC_KEY' 
+      // with your actual EmailJS credentials.
+      
+      const emailParams = {
+        to_email: 'aalendingservices@gmail.com',
+        from_name: formData.name,
+        student_id: formData.schoolId,
+        amount: formData.loanAmount,
+        purpose: formData.loanPurpose,
+        phone: formData.phone,
+        message: `New Loan Application from ${formData.name}. Course: ${formData.course}. Method: ${formData.disbursementMethod}.`,
+      };
+
+      // We attempt to send email, but don't block success if email fails (though we log it)
+      try {
+        await emailjs.send(
+          'YOUR_SERVICE_ID',   // <--- REPLACE THIS from EmailJS
+          'YOUR_TEMPLATE_ID',  // <--- REPLACE THIS from EmailJS
+          emailParams,
+          'YOUR_PUBLIC_KEY'    // <--- REPLACE THIS from EmailJS
+        );
+        console.log("Email notification sent successfully.");
+      } catch (emailError) {
+        console.error("Failed to send email notification:", emailError);
+        // We continue to show success because DB save worked
+      }
+
       setIsSubmitted(true);
       
-      // Optional: Still trigger mailto as a backup/notification if desired by user workflow
-      // For now, we rely on the Firestore success message.
-
     } catch (err) {
       console.error("Error writing document to Firestore: ", err);
       alert("There was an error submitting your application. Please check your internet connection and try again.");
