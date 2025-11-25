@@ -202,7 +202,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     if (formData.disbursementMethod === 'gcash' || formData.disbursementMethod === 'maya') {
       if (!formData.walletNumber) {
         stepErrors.walletNumber = 'Wallet number is required';
-      } else if (!validatePhone(formData.walletNumber)) {
+      } else if (formData.walletNumber && !validatePhone(formData.walletNumber)) {
         stepErrors.walletNumber = 'Please enter a valid 11-digit mobile number starting with 09.';
       }
     }
@@ -217,7 +217,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       return;
     }
 
-    // --- SIMULATE BACKEND SUBMISSION (For Admin Panel Demo) ---
+    // --- SIMULATE BACKEND SUBMISSION (For Admin Panel Reflection) ---
     // We save the application to localStorage so the Admin Panel can read it.
     
     const newApplication = {
@@ -240,8 +240,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       console.error("Could not save to local storage", err);
     }
 
-    // --- EMAIL GENERATION (Existing Logic) ---
-    
+    // --- EMAIL GENERATION ---
     const recipient = 'aalendingservices@gmail.com';
     const subject = `New Loan Application: ${formData.name} (ID: ${newApplication.id})`;
     
@@ -329,7 +328,7 @@ IMPORTANT: Please attach the required files before sending:
               <p className="text-gray-600 mb-6">We've prepared your application. Please verify the details in your email client and click 'Send' to complete your application.</p>
               <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md" role="alert">
                   <p className="font-bold">Important:</p>
-                  <p>Don't forget to attach your Certificate of Registration (COR) and School ID picture before sending the email.</p>
+                  <p>Don't forget to attach your Certificate of Registration (COR) and School ID picture before sending the email to <strong>aalendingservices@gmail.com</strong>.</p>
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
                 <button

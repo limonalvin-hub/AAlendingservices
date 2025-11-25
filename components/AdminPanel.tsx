@@ -35,6 +35,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   // Maintenance State
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
+  // LINKED EMAIL CONSTANT
+  const LINKED_EMAIL = "aalendingservices@gmail.com";
+
   useEffect(() => {
     // Check if already logged in this session
     const sessionAuth = sessionStorage.getItem('adminAuth');
@@ -135,6 +138,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       alert(`[SYSTEM AUTOMATION VERIFICATION]
       
 Status Changed To: ${status.toUpperCase()}
+Sent From: ${LINKED_EMAIL}
 
 --- SIMULATED SMS TO ${app.phone} ---
 "${smsMessage}"
@@ -197,6 +201,8 @@ Allowance Aid Admin`;
     // Simulate sending (in a real app, this would hit an API)
     alert(`[MANUAL REMINDER VERIFICATION]
     
+From: ${LINKED_EMAIL}
+
 1. SMS Sent to ${app.phone}:
 "${smsMessage}"
 
@@ -282,7 +288,13 @@ Body: (Sent successfully)`);
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-brand-blue-dark">Admin Dashboard</h1>
           <div className="flex items-center space-x-4">
-             <span className="text-gray-600">Welcome, Admin</span>
+             <div className="text-right hidden sm:block">
+               <span className="text-gray-600 block text-sm font-medium">Welcome, Admin</span>
+               <span className="text-xs text-brand-blue flex items-center justify-end gap-1">
+                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                 Linked: {LINKED_EMAIL}
+               </span>
+             </div>
              <button onClick={handleLogout} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded transition">
                 Logout
              </button>
