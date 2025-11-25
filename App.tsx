@@ -77,8 +77,8 @@ function App() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // 5. The Heartbeat (Real-Time Simulation)
-    // Polls every 500ms (0.5s) to ensure "Instant" reaction time.
-    const heartbeat = setInterval(checkSystemStatus, 500);
+    // Polls every 2000ms (2s) to ensure "Instant" reaction time without killing battery.
+    const heartbeat = setInterval(checkSystemStatus, 2000);
 
     // Cleanup
     return () => {

@@ -1,5 +1,7 @@
 
 import React, { useState, FormEvent, useRef } from 'react';
+import { db } from '../firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -7,6 +9,7 @@ interface LoanApplicationFormProps {
 
 const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
@@ -50,9 +53,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Prevent scrolling when touching the canvas
     if ('touches' in e) {
-       // Handled by CSS touch-action: none, but good practice to be aware
+       // Handled by CSS touch-action: none
     }
 
     setIsDrawing(true);
@@ -122,7 +124,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     const { name, value } = e.target;
     setFormData(prevState => ({ ...prevState, [name]: value }));
 
-    // Real-time validation
     if (name === 'phone' || name === 'walletNumber') {
       if (value && !validatePhone(value)) {
         setErrors(prev => ({ ...prev, [name]: 'Please enter a valid 11-digit mobile number starting with 09.' }));
@@ -134,7 +135,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         });
       }
     } else {
-      // Clear errors for other fields on change
       if (errors[name]) {
         setErrors(prev => {
           const newErrors = { ...prev };
@@ -153,7 +153,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       
       if (error) {
         setErrors(prev => ({ ...prev, [name]: error }));
-        e.target.value = ''; // Reset file input
+        e.target.value = '';
         setFormData(prevState => ({ ...prevState, [name]: null }));
       } else {
         setErrors(prev => {
@@ -167,7 +167,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   };
 
   const nextStep = () => {
-    // Validate step 1
     const stepErrors: Record<string, string> = {};
     if (!formData.name) stepErrors.name = 'Full Name is required';
     if (!formData.schoolId) stepErrors.schoolId = 'School ID is required';
@@ -190,9 +189,10 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
+    if (isSubmitting) return;
+
     // Validate step 2
     const stepErrors: Record<string, string> = {};
     if (!formData.loanAmount) stepErrors.loanAmount = 'Loan amount is required';
@@ -217,78 +217,41 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       return;
     }
 
-    // --- SIMULATE BACKEND SUBMISSION (For Admin Panel Reflection) ---
-    // We save the application to localStorage so the Admin Panel can read it.
-    
-    const newApplication = {
-      id: Date.now().toString(), // simple unique ID
-      date: new Date().toISOString(),
-      status: 'Pending',
-      ...formData,
-      // We can't save File objects to localStorage easily, so we just save names for demo
-      corFileName: formData.corFile ? formData.corFile.name : 'Not attached',
-      schoolIdFileName: formData.schoolIdFile ? formData.schoolIdFile.name : 'Not attached',
-      // Removing actual file objects from storage payload
-      corFile: undefined,
-      schoolIdFile: undefined
-    };
+    setIsSubmitting(true);
 
+    // --- FIREBASE FIRESTORE SUBMISSION ---
     try {
-      const existingApps = JSON.parse(localStorage.getItem('loanApplications') || '[]');
-      localStorage.setItem('loanApplications', JSON.stringify([newApplication, ...existingApps]));
+      const newApplication = {
+        date: new Date().toISOString(),
+        status: 'Pending',
+        name: formData.name,
+        schoolId: formData.schoolId,
+        course: formData.course,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email,
+        loanPurpose: formData.loanPurpose,
+        loanAmount: formData.loanAmount,
+        disbursementMethod: formData.disbursementMethod,
+        walletNumber: formData.walletNumber,
+        corFileName: formData.corFile ? formData.corFile.name : 'Not attached',
+        schoolIdFileName: formData.schoolIdFile ? formData.schoolIdFile.name : 'Not attached',
+        signature: formData.signature // Saving base64 signature string directly
+      };
+
+      await addDoc(collection(db, "applications"), newApplication);
+      console.log("Document successfully written to Firestore!");
+      setIsSubmitted(true);
+      
+      // Optional: Still trigger mailto as a backup/notification if desired by user workflow
+      // For now, we rely on the Firestore success message.
+
     } catch (err) {
-      console.error("Could not save to local storage", err);
+      console.error("Error writing document to Firestore: ", err);
+      alert("There was an error submitting your application. Please check your internet connection and try again.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    // --- EMAIL GENERATION ---
-    const recipient = 'aalendingservices@gmail.com';
-    const subject = `New Loan Application: ${formData.name} (ID: ${newApplication.id})`;
-    
-    let disbursementDetails = '';
-    if (formData.disbursementMethod === 'gcash') {
-      disbursementDetails = `Method: GCash\nE-Wallet Number: ${formData.walletNumber}`;
-    } else if (formData.disbursementMethod === 'maya') {
-      disbursementDetails = `Method: Maya\nE-Wallet Number: ${formData.walletNumber}`;
-    } else {
-      disbursementDetails = `Method: Claim In Person`;
-    }
-
-    const body = `
-A new loan application has been submitted with the following details:
-
---- Personal Information ---
-Full Name: ${formData.name}
-School ID Number: ${formData.schoolId}
-College Course: ${formData.course}
-Address: ${formData.address}
-Phone Number: ${formData.phone}
-Email Address: ${formData.email}
-
---- Loan Details ---
-Loan Amount Requested: ₱${formData.loanAmount}
-Purpose of Loan: ${formData.loanPurpose}
-
---- Receiving Options ---
-${disbursementDetails}
-
---- Certification ---
-Signed: Yes (Electronically Signed via App)
-Date: ${new Date().toLocaleDateString()}
-Agreed to Terms: Yes
-
----
-IMPORTANT: Please attach the required files before sending:
-1. Certificate of Registration (COR)
-2. School ID (Front & Back)
-    `;
-
-    // Encode the subject and body for the URL
-    const mailtoLink = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-    // Open the user's email client
-    window.location.href = mailtoLink;
-
-    setIsSubmitted(true);
   };
 
   const handleNewApplication = () => {
@@ -324,11 +287,11 @@ IMPORTANT: Please attach the required files before sending:
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done! Please Send Your Application</h3>
-              <p className="text-gray-600 mb-6">We've prepared your application. Please verify the details in your email client and click 'Send' to complete your application.</p>
-              <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md" role="alert">
-                  <p className="font-bold">Important:</p>
-                  <p>Don't forget to attach your Certificate of Registration (COR) and School ID picture before sending the email to <strong>aalendingservices@gmail.com</strong>.</p>
+              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Received!</h3>
+              <p className="text-gray-600 mb-6">Your loan application has been successfully submitted to our system.</p>
+              <div className="bg-blue-50 border-l-4 border-brand-blue text-brand-blue-dark p-4 rounded-md mb-8" role="alert">
+                  <p className="font-bold">What happens next?</p>
+                  <p>Our admins will review your details. You may be contacted via email or phone for further verification.</p>
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
                 <button
@@ -557,10 +520,10 @@ IMPORTANT: Please attach the required files before sending:
                       <button type="button" onClick={prevStep} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Back</button>
                       <button 
                         type="submit" 
-                        disabled={!agreedToTerms}
-                        className={`bg-brand-green text-white font-bold py-3 px-6 rounded-lg transition duration-300 ${!agreedToTerms ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-green-light'}`}
+                        disabled={!agreedToTerms || isSubmitting}
+                        className={`bg-brand-green text-white font-bold py-3 px-6 rounded-lg transition duration-300 ${!agreedToTerms || isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-green-light'}`}
                       >
-                        Submit Application
+                        {isSubmitting ? 'Submitting...' : 'Submit Application'}
                       </button>
                     </div>
                   </div>
