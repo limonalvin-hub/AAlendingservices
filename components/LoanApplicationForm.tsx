@@ -219,7 +219,9 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     setIsSubmitting(true);
 
-    // --- 1. FIREBASE DB SUBMISSION (Action B) ---
+    // --- 1. FIREBASE DB SUBMISSION (Action B: Storage) ---
+    // This logic connects to the Firestore database initialized in firebaseConfig.ts
+    // It creates a new document in the 'applications' collection.
     try {
       const newApplication = {
         date: new Date().toISOString(),
@@ -242,32 +244,32 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       await addDoc(collection(db, "applications"), newApplication);
       console.log("Document successfully written to Firestore!");
       
-      // --- 2. EMAIL NOTIFICATION (Action A) ---
-      // NOTE: You must replace 'YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', 'YOUR_PUBLIC_KEY' 
-      // with your actual EmailJS credentials.
+      // --- 2. EMAIL NOTIFICATION (Action A: Notification) ---
+      // This sends the data to your Gmail via EmailJS.
+      // IMPORTANT: Update these IDs with your actual EmailJS credentials.
       
       const emailParams = {
-        to_email: 'aalendingservices@gmail.com',
+        to_email: 'aalendingservices@gmail.com', // Target admin email
         from_name: formData.name,
         student_id: formData.schoolId,
         amount: formData.loanAmount,
         purpose: formData.loanPurpose,
         phone: formData.phone,
-        message: `New Loan Application from ${formData.name}. Course: ${formData.course}. Method: ${formData.disbursementMethod}.`,
+        date: new Date().toLocaleDateString(),
+        message: `New Loan Application.\nCourse: ${formData.course}\nMethod: ${formData.disbursementMethod} (${formData.walletNumber})\nAddress: ${formData.address}`,
       };
 
-      // We attempt to send email, but don't block success if email fails (though we log it)
       try {
         await emailjs.send(
-          'YOUR_SERVICE_ID',   // <--- REPLACE THIS from EmailJS
-          'YOUR_TEMPLATE_ID',  // <--- REPLACE THIS from EmailJS
+          'YOUR_SERVICE_ID',   // Replace with your EmailJS Service ID
+          'YOUR_TEMPLATE_ID',  // Replace with your EmailJS Template ID
           emailParams,
-          'YOUR_PUBLIC_KEY'    // <--- REPLACE THIS from EmailJS
+          'YOUR_PUBLIC_KEY'    // Replace with your EmailJS Public Key
         );
         console.log("Email notification sent successfully.");
       } catch (emailError) {
         console.error("Failed to send email notification:", emailError);
-        // We continue to show success because DB save worked
+        // Note: We don't block the success UI if email fails, as the DB save is the priority.
       }
 
       setIsSubmitted(true);

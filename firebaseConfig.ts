@@ -2,8 +2,8 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 // --- FIREBASE CONFIGURATION ---
-// TODO: Replace the values below with your specific Firebase Project configuration.
-// You can find these in the Firebase Console under Project Settings -> General.
+// IMPORTANT: You must replace the values below with your specific Firebase Project configuration.
+// Go to: https://console.firebase.google.com/ -> Project Settings -> General -> Your Apps -> SDK Setup
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY_HERE",
   authDomain: "YOUR_PROJECT_ID.firebaseapp.com",

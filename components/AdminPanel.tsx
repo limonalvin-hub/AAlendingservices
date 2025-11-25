@@ -46,10 +46,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     }
   }, []);
 
-  // --- REAL-TIME FIRESTORE LISTENER ---
+  // --- REAL-TIME FIRESTORE LISTENER (Action: Fetch from DB) ---
   useEffect(() => {
     if (isAuthenticated) {
-      // Subscribe to the 'applications' collection
+      // Subscribe to the 'applications' collection, ordered by newest first
       const q = query(collection(db, "applications"), orderBy("date", "desc"));
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -93,22 +93,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     // Note: Maintenance mode is currently local state/storage. 
     // To make this global across users, we would need to save it to Firestore too.
     localStorage.setItem('allowance_aid_maintenance_mode', String(newStatus));
-  };
-
-  const calculateRepayment = (amountStr: string) => {
-    const amount = parseFloat(amountStr);
-    if (isNaN(amount)) return { total: 0, interestRate: 0, interestAmount: 0 };
-    let rate = 0;
-    if (amount <= 299) rate = 0.05;
-    else if (amount >= 300 && amount <= 599) rate = 0.07;
-    else if (amount >= 600) rate = 0.10;
-    const interestAmount = amount * rate;
-    const total = amount + interestAmount;
-    return { 
-      total: total.toFixed(2), 
-      interestRate: (rate * 100).toFixed(0), 
-      interestAmount: interestAmount.toFixed(2) 
-    };
   };
 
   const updateStatus = async (id: string, newStatus: string) => {
