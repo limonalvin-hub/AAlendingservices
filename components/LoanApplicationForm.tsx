@@ -24,6 +24,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     schoolIdFile: null as File | null,
     signature: '',
   });
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Signature Canvas Logic
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -209,6 +210,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     if (!formData.corFile) stepErrors.corFile = 'Certificate of Registration is required';
     if (!formData.schoolIdFile) stepErrors.schoolIdFile = 'School ID is required';
     if (!formData.signature) stepErrors.signature = 'Please sign the application';
+    if (!agreedToTerms) stepErrors.terms = 'You must agree to the terms and conditions.';
 
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
@@ -273,6 +275,7 @@ ${disbursementDetails}
 --- Certification ---
 Signed: Yes (Electronically Signed via App)
 Date: ${new Date().toLocaleDateString()}
+Agreed to Terms: Yes
 
 ---
 IMPORTANT: Please attach the required files before sending:
@@ -293,6 +296,7 @@ IMPORTANT: Please attach the required files before sending:
     setIsSubmitted(false);
     setStep(1);
     setErrors({});
+    setAgreedToTerms(false);
     setFormData({
       name: '',
       schoolId: '',
@@ -512,10 +516,53 @@ IMPORTANT: Please attach the required files before sending:
                         {errors.signature && <p className="text-red-500 text-xs mt-1">{errors.signature}</p>}
                       </div>
 
+                       {/* Terms and Conditions Section */}
+                      <div className="border-t border-gray-200 pt-4 mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Agreement</label>
+                        <div className="h-24 overflow-y-auto border border-gray-300 rounded-md p-3 bg-gray-50 text-xs text-gray-600 space-y-2">
+                            <p><strong>1. Loan Agreement:</strong> By submitting this application, I agree to the terms of the loan agreement which will be provided upon approval. This includes the principal amount, interest rate, repayment schedule, and any applicable fees.</p>
+                            <p><strong>2. Data Privacy:</strong> I consent to the collection and use of my personal information for the purpose of processing this loan application, in accordance with the Data Privacy Act of 2012.</p>
+                            <p><strong>3. Repayment Obligation:</strong> I understand that I am obligated to repay the loan on time. Failure to do so may result in penalties and affect my ability to apply for future loans.</p>
+                            <p><strong>4. Accuracy of Information:</strong> I certify that all information provided in this application is true and correct to the best of my knowledge.</p>
+                        </div>
+                        <div className="mt-3 flex items-start">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="terms"
+                                    name="terms"
+                                    type="checkbox"
+                                    checked={agreedToTerms}
+                                    onChange={(e) => {
+                                      setAgreedToTerms(e.target.checked);
+                                      if (errors.terms) {
+                                          setErrors(prev => {
+                                              const newErrors = { ...prev };
+                                              delete newErrors.terms;
+                                              return newErrors;
+                                          });
+                                      }
+                                    }}
+                                    className="focus:ring-brand-blue h-5 w-5 text-brand-blue border-gray-300 rounded"
+                                />
+                            </div>
+                            <div className="ml-3 text-sm">
+                                <label htmlFor="terms" className="font-medium text-gray-700">
+                                    I have read and agree to the Terms and Conditions.
+                                </label>
+                            </div>
+                        </div>
+                        {errors.terms && <p className="text-red-500 text-xs mt-1">{errors.terms}</p>}
+                      </div>
                     </div>
                     <div className="mt-8 flex justify-between items-center gap-4">
                       <button type="button" onClick={prevStep} className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300">Back</button>
-                      <button type="submit" className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-3 px-6 rounded-lg transition duration-300">Submit Application</button>
+                      <button 
+                        type="submit" 
+                        disabled={!agreedToTerms}
+                        className={`bg-brand-green text-white font-bold py-3 px-6 rounded-lg transition duration-300 ${!agreedToTerms ? 'opacity-50 cursor-not-allowed' : 'hover:bg-brand-green-light'}`}
+                      >
+                        Submit Application
+                      </button>
                     </div>
                   </div>
                 )}
