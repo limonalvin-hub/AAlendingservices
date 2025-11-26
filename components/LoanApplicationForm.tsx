@@ -1,7 +1,5 @@
 
 import React, { useState, FormEvent, useRef } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
 
 interface LoanApplicationFormProps {
@@ -221,8 +219,11 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     setIsSubmitting(true);
 
     try {
-      // --- ACTION B: STORAGE (Firebase Firestore) ---
+      // --- ACTION: SAVE TO LOCAL STORAGE (Simulated DB for Admin Panel) ---
+      // Since Firebase is removed, we save to localStorage so the Admin Panel on this device
+      // can still see the application for demonstration purposes.
       const newApplication = {
+        id: Date.now().toString(),
         date: new Date().toISOString(),
         status: 'Pending',
         name: formData.name,
@@ -240,17 +241,18 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         signature: formData.signature 
       };
 
-      // Save to 'applications' collection
-      await addDoc(collection(db, "applications"), newApplication);
-      console.log("Action B Complete: Data saved to Firestore.");
-      
-      // --- ACTION A: NOTIFICATION (EmailJS) ---
-      // IMPORTANT: These keys are from your configuration
+      const existingApps = JSON.parse(localStorage.getItem('loanApplications') || '[]');
+      const updatedApps = [newApplication, ...existingApps];
+      localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
+      // Notify other tabs/components
+      window.dispatchEvent(new Event('storage'));
+
+      // --- ACTION: SEND EMAIL VIA EMAILJS ---
       const emailParams = {
-        user_name: formData.name,        // Mapped to standard EmailJS template variable
-        user_email: formData.email,      // Mapped to standard EmailJS template variable
-        phone_number: formData.phone,    // Mapped to standard EmailJS template variable
-        loan_amount: formData.loanAmount, // Mapped to standard EmailJS template variable
+        user_name: formData.name,        
+        user_email: formData.email,      
+        phone_number: formData.phone,    
+        loan_amount: formData.loanAmount,
         message: `
           New Application Received.
           Student ID: ${formData.schoolId}
@@ -259,30 +261,28 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
           Purpose: ${formData.loanPurpose}
           Method: ${formData.disbursementMethod} (${formData.walletNumber || 'N/A'})
         `,
-        // Also passing these as direct matches if your template uses specific custom names
         student_id: formData.schoolId,
         amount: formData.loanAmount,
         purpose: formData.loanPurpose,
       };
 
-      try {
-        await emailjs.send(
-          'service_s8z8tr4',   // YOUR SERVICE ID
-          'template_ho8kor7',  // YOUR TEMPLATE ID
-          emailParams,
-          'Qs4emMBTdTNhLwKzR'    // YOUR PUBLIC KEY
-        );
-        console.log("Action A Complete: Email notification sent.");
-      } catch (emailError) {
-        console.error("Failed to send email notification:", emailError);
-        // We do not fail the whole process if email fails, as DB save is critical
-      }
-
+      await emailjs.send(
+        'service_s8z8tr4',   // YOUR SERVICE ID
+        'template_ho8kor7',  // YOUR TEMPLATE ID
+        emailParams,
+        'Qs4emMBTdTNhLwKzR'    // YOUR PUBLIC KEY
+      );
+      
+      console.log("Application submitted via EmailJS");
       setIsSubmitted(true);
       
     } catch (err) {
       console.error("Error submitting application: ", err);
-      alert("There was an error submitting your application. Please check your internet connection.");
+      // Fallback: If EmailJS fails, we still consider it submitted locally
+      if (!isSubmitted) {
+         alert("Application saved locally, but email notification failed. Please check your connection.");
+         setIsSubmitted(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -322,7 +322,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Received!</h3>
-              <p className="text-gray-600 mb-6">Your loan application has been successfully submitted to our system.</p>
+              <p className="text-gray-600 mb-6">Your loan application has been successfully sent to our team via email.</p>
               <div className="bg-blue-50 border-l-4 border-brand-blue text-brand-blue-dark p-4 rounded-md mb-8" role="alert">
                   <p className="font-bold">What happens next?</p>
                   <p>Our admins will review your details. You may be contacted via email or phone for further verification.</p>

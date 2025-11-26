@@ -1,14 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, onSnapshot, query, orderBy, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 
 interface AdminPanelProps {
   onBack: () => void;
 }
 
 interface LoanApplication {
-  id: string; // Firestore Doc ID
+  id: string; // ID
   date: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Paid';
   name: string;
@@ -45,26 +43,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     }
   }, []);
 
-  // --- REAL-TIME FIRESTORE LISTENER (Action: Fetch from DB) ---
+  // --- LOCAL STORAGE LISTENER (Action: Fetch from Local DB) ---
+  const fetchApplications = () => {
+    try {
+      const stored = localStorage.getItem('loanApplications');
+      if (stored) {
+        const apps = JSON.parse(stored) as LoanApplication[];
+        // Sort newest first
+        apps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setApplications(apps);
+      }
+    } catch (err) {
+      console.error("Failed to load applications", err);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
-      // Subscribe to the 'applications' collection, ordered by newest first
-      const q = query(collection(db, "applications"), orderBy("date", "desc"));
-      
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const apps = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as LoanApplication[];
-        
-        setApplications(apps);
-      }, (error) => {
-        console.error("Error fetching real-time data: ", error);
-        alert("Error connecting to database. Please check your config.");
-      });
-
-      // Cleanup listener on unmount
-      return () => unsubscribe();
+      fetchApplications();
+      // Listen for updates from other tabs
+      window.addEventListener('storage', fetchApplications);
+      // Poll every 2 seconds to act as "Real-time"
+      const interval = setInterval(fetchApplications, 2000);
+      return () => {
+        window.removeEventListener('storage', fetchApplications);
+        clearInterval(interval);
+      };
     }
   }, [isAuthenticated]);
 
@@ -86,11 +90,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     onBack();
   };
 
-  const updateStatus = async (id: string, newStatus: string) => {
+  const updateStatus = async (id: string, newStatus: any) => {
     try {
-      const appRef = doc(db, "applications", id);
-      await updateDoc(appRef, { status: newStatus });
-      console.log(`Updated ${id} to ${newStatus}`);
+       const updatedApps = applications.map(app => 
+         app.id === id ? { ...app, status: newStatus } : app
+       );
+       setApplications(updatedApps);
+       localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
+       console.log(`Updated ${id} to ${newStatus}`);
     } catch (err) {
       console.error("Error updating status:", err);
       alert("Failed to update status.");
@@ -100,7 +107,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const deleteApplication = async (id: string) => {
     if (confirm('Are you sure you want to delete this application?')) {
       try {
-        await deleteDoc(doc(db, "applications", id));
+        const updatedApps = applications.filter(app => app.id !== id);
+        setApplications(updatedApps);
+        localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
       } catch (err) {
         console.error("Error deleting document:", err);
         alert("Failed to delete application.");
@@ -224,7 +233,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         {/* List */}
         <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h3 className="text-lg font-medium text-gray-900">Real-time Applications</h3>
+                <h3 className="text-lg font-medium text-gray-900">Recent Applications</h3>
                 <div className="flex space-x-2">
                     {['All', 'Pending', 'Approved', 'Rejected'].map(status => (
                         <button
@@ -257,7 +266,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                         {filteredApps.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                                    No applications found in database.
+                                    No applications found locally.
                                 </td>
                             </tr>
                         ) : (
