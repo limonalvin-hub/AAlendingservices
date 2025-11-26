@@ -220,8 +220,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     try {
       // --- ACTION: SAVE TO LOCAL STORAGE (Simulated DB for Admin Panel) ---
-      // Since Firebase is removed, we save to localStorage so the Admin Panel on this device
-      // can still see the application for demonstration purposes.
       const newApplication = {
         id: Date.now().toString(),
         date: new Date().toISOString(),
@@ -244,8 +242,13 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       const existingApps = JSON.parse(localStorage.getItem('loanApplications') || '[]');
       const updatedApps = [newApplication, ...existingApps];
       localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
-      // Notify other tabs/components
-      window.dispatchEvent(new Event('storage'));
+      
+      // --- REAL-TIME BROADCAST ---
+      // Instead of relying on polling, we use the Broadcast Channel API
+      // to instantly notify the Admin Panel tab (if open) about the new data.
+      const syncChannel = new BroadcastChannel('app_sync_channel');
+      syncChannel.postMessage({ type: 'NEW_APPLICATION_SUBMITTED' });
+      syncChannel.close();
 
       // --- ACTION: SEND EMAIL VIA EMAILJS ---
       const emailParams = {

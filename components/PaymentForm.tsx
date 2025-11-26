@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 
 interface PaymentFormProps {
@@ -55,7 +56,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onBack }) => {
         // 3. Save back to storage if a match was updated
         if (matchFound) {
           localStorage.setItem('loanApplications', JSON.stringify(apps));
-          console.log("Payment automatically matched and record updated to Paid.");
+          
+          // --- REAL-TIME BROADCAST ---
+          // Notify Admin Panel instantly using BroadcastChannel API
+          const syncChannel = new BroadcastChannel('app_sync_channel');
+          syncChannel.postMessage({ type: 'PAYMENT_RECEIVED' });
+          syncChannel.close();
+
+          console.log("Payment automatically matched, record updated, and admin notified.");
         }
       }
     } catch (err) {

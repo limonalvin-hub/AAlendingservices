@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface AdminPanelProps {
   onBack: () => void;
@@ -31,6 +31,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const [error, setError] = useState('');
   const [applications, setApplications] = useState<LoanApplication[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [newArrival, setNewArrival] = useState(false);
+  
+  // Ref to track previous count for notification logic
+  const prevCountRef = useRef(0);
 
   // AUTH CONSTANT
   const REQUIRED_EMAIL = "aalendingservices@gmail.com";
@@ -49,9 +53,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
       const stored = localStorage.getItem('loanApplications');
       if (stored) {
         const apps = JSON.parse(stored) as LoanApplication[];
+        
         // Sort newest first
         apps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setApplications(apps);
+        
+        setApplications(prevApps => {
+           // Check for new arrivals (Logic: count increased)
+           if (apps.length > prevApps.length && prevApps.length > 0) {
+               setNewArrival(true);
+               // Auto-hide notification after 3s
+               setTimeout(() => setNewArrival(false), 3000);
+           }
+           return apps;
+        });
+
+        // Update ref
+        prevCountRef.current = apps.length;
       }
     } catch (err) {
       console.error("Failed to load applications", err);
@@ -60,14 +77,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
 
   useEffect(() => {
     if (isAuthenticated) {
+      // Initial fetch
       fetchApplications();
-      // Listen for updates from other tabs
-      window.addEventListener('storage', fetchApplications);
-      // Poll every 2 seconds to act as "Real-time"
-      const interval = setInterval(fetchApplications, 2000);
+
+      // --- BROADCAST CHANNEL (Replacing Polling) ---
+      // This creates a dedicated communication channel between tabs/windows.
+      // It behaves like a WebSocket but local to the browser instance.
+      const syncChannel = new BroadcastChannel('app_sync_channel');
+      
+      syncChannel.onmessage = (event) => {
+         console.log("Broadcast received:", event.data);
+         // When any other tab (Application Form, Payment Form) posts a message,
+         // we instantly refresh the data here.
+         fetchApplications();
+         
+         // Trigger visual indicator if it's a new application
+         if (event.data.type === 'NEW_APPLICATION_SUBMITTED') {
+             setNewArrival(true);
+             setTimeout(() => setNewArrival(false), 3000);
+         }
+      };
+
+      // Fallback: Listen for focus (Immediate refresh when user switches back to this tab)
+      const handleFocus = () => {
+          fetchApplications();
+      };
+      window.addEventListener('focus', handleFocus);
+
       return () => {
-        window.removeEventListener('storage', fetchApplications);
-        clearInterval(interval);
+        syncChannel.close(); // Close connection
+        window.removeEventListener('focus', handleFocus);
       };
     }
   }, [isAuthenticated]);
@@ -97,6 +136,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
        );
        setApplications(updatedApps);
        localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
+       
+       // Broadcast update to other potential admin tabs
+       const syncChannel = new BroadcastChannel('app_sync_channel');
+       syncChannel.postMessage({ type: 'STATUS_UPDATED', id, newStatus });
+       syncChannel.close();
+       
        console.log(`Updated ${id} to ${newStatus}`);
     } catch (err) {
       console.error("Error updating status:", err);
@@ -110,6 +155,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         const updatedApps = applications.filter(app => app.id !== id);
         setApplications(updatedApps);
         localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
+        
+        // Broadcast update
+        const syncChannel = new BroadcastChannel('app_sync_channel');
+        syncChannel.postMessage({ type: 'APPLICATION_DELETED', id });
+        syncChannel.close();
+
       } catch (err) {
         console.error("Error deleting document:", err);
         alert("Failed to delete application.");
@@ -191,7 +242,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow sticky top-0 z-50">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-brand-blue-dark">Admin Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-brand-blue-dark">Admin Dashboard</h1>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+              Event-Driven Sync
+            </span>
+          </div>
           <div className="flex items-center space-x-4">
              <div className="text-right hidden sm:block">
                <span className="text-gray-600 block text-sm font-medium">Logged in as</span>
@@ -203,6 +260,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
           </div>
         </div>
       </header>
+
+      {/* New Application Notification */}
+      {newArrival && (
+        <div className="bg-blue-600 text-white text-center py-2 px-4 animate-fade-in shadow-lg sticky top-24 z-40 mx-auto max-w-md rounded-full mt-2 transform transition-all duration-300">
+            🔔 New data received! Dashboard updated.
+        </div>
+      )}
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* Stats Grid */}
