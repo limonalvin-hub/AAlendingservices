@@ -1,12 +1,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { db } from '../firebaseConfig';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import emailjs from '@emailjs/browser';
 
 interface AdminPanelProps {
   onBack: () => void;
 }
 
 interface LoanApplication {
-  id: string; // ID
+  id: string; // Firestore Document ID
   date: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Paid';
   name: string;
@@ -39,6 +42,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   // AUTH CONSTANT
   const REQUIRED_EMAIL = "aalendingservices@gmail.com";
 
+  // EMAILJS CONFIG
+  const EMAILJS_SERVICE_ID = 'service_s8z8tr4';
+  const EMAILJS_TEMPLATE_ID = 'template_ho8kor7';
+  const EMAILJS_PUBLIC_KEY = 'Qs4emMBTdTNhLwKzR';
+
   useEffect(() => {
     // Session persistence for refreshing
     const sessionAuth = sessionStorage.getItem('adminAuth');
@@ -47,67 +55,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     }
   }, []);
 
-  // --- LOCAL STORAGE LISTENER (Action: Fetch from Local DB) ---
-  const fetchApplications = () => {
-    try {
-      const stored = localStorage.getItem('loanApplications');
-      if (stored) {
-        const apps = JSON.parse(stored) as LoanApplication[];
-        
-        // Sort newest first
-        apps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // --- FIRESTORE LISTENER (Real-Time Fetch) ---
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Create a query against the collection.
+      const q = query(collection(db, "applications"), orderBy("date", "desc"));
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const apps: LoanApplication[] = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as LoanApplication));
         
         setApplications(prevApps => {
            // Check for new arrivals (Logic: count increased)
            if (apps.length > prevApps.length && prevApps.length > 0) {
                setNewArrival(true);
-               // Auto-hide notification after 3s
                setTimeout(() => setNewArrival(false), 3000);
            }
            return apps;
         });
 
-        // Update ref
         prevCountRef.current = apps.length;
-      }
-    } catch (err) {
-      console.error("Failed to load applications", err);
-    }
-  };
+      }, (error) => {
+        console.error("Error fetching applications: ", error);
+      });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      // Initial fetch
-      fetchApplications();
-
-      // --- BROADCAST CHANNEL (Replacing Polling) ---
-      // This creates a dedicated communication channel between tabs/windows.
-      // It behaves like a WebSocket but local to the browser instance.
-      const syncChannel = new BroadcastChannel('app_sync_channel');
-      
-      syncChannel.onmessage = (event) => {
-         console.log("Broadcast received:", event.data);
-         // When any other tab (Application Form, Payment Form) posts a message,
-         // we instantly refresh the data here.
-         fetchApplications();
-         
-         // Trigger visual indicator if it's a new application
-         if (event.data.type === 'NEW_APPLICATION_SUBMITTED') {
-             setNewArrival(true);
-             setTimeout(() => setNewArrival(false), 3000);
-         }
-      };
-
-      // Fallback: Listen for focus (Immediate refresh when user switches back to this tab)
-      const handleFocus = () => {
-          fetchApplications();
-      };
-      window.addEventListener('focus', handleFocus);
-
-      return () => {
-        syncChannel.close(); // Close connection
-        window.removeEventListener('focus', handleFocus);
-      };
+      // Cleanup subscription on unmount
+      return () => unsubscribe();
     }
   }, [isAuthenticated]);
 
@@ -129,20 +104,45 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     onBack();
   };
 
-  const updateStatus = async (id: string, newStatus: any) => {
+  const updateStatus = async (id: string, newStatus: any, applicantEmail?: string, applicantName?: string, loanAmount?: string) => {
     try {
-       const updatedApps = applications.map(app => 
-         app.id === id ? { ...app, status: newStatus } : app
-       );
-       setApplications(updatedApps);
-       localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
-       
-       // Broadcast update to other potential admin tabs
-       const syncChannel = new BroadcastChannel('app_sync_channel');
-       syncChannel.postMessage({ type: 'STATUS_UPDATED', id, newStatus });
-       syncChannel.close();
+       const appRef = doc(db, "applications", id);
+       await updateDoc(appRef, {
+         status: newStatus
+       });
        
        console.log(`Updated ${id} to ${newStatus}`);
+
+       // --- SEND AUTOMATED EMAIL NOTIFICATION ---
+       if (applicantEmail && applicantName && (newStatus === 'Approved' || newStatus === 'Rejected')) {
+          let messageBody = "";
+          
+          if (newStatus === 'Approved') {
+            messageBody = `Congratulations! Your loan application for ₱${loanAmount} has been APPROVED. The funds will be disbursed to your chosen account shortly. Please ensure your lines are open for verification.`;
+          } else {
+            messageBody = `We regret to inform you that your loan application has been declined at this time after our review process. You may try applying again in the future.`;
+          }
+
+          const emailParams = {
+            user_name: applicantName,
+            user_email: applicantEmail,
+            message: messageBody,
+            loan_amount: loanAmount,
+            // These might be redundant depending on your template structure, but good to have
+            status_message: messageBody 
+          };
+
+          await emailjs.send(
+            EMAILJS_SERVICE_ID,
+            EMAILJS_TEMPLATE_ID,
+            emailParams,
+            EMAILJS_PUBLIC_KEY
+          );
+          alert(`Status updated to ${newStatus} and email notification sent to ${applicantEmail}.`);
+       } else {
+          alert(`Status updated to ${newStatus}.`);
+       }
+
     } catch (err) {
       console.error("Error updating status:", err);
       alert("Failed to update status.");
@@ -152,15 +152,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const deleteApplication = async (id: string) => {
     if (confirm('Are you sure you want to delete this application?')) {
       try {
-        const updatedApps = applications.filter(app => app.id !== id);
-        setApplications(updatedApps);
-        localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
-        
-        // Broadcast update
-        const syncChannel = new BroadcastChannel('app_sync_channel');
-        syncChannel.postMessage({ type: 'APPLICATION_DELETED', id });
-        syncChannel.close();
-
+        await deleteDoc(doc(db, "applications", id));
       } catch (err) {
         console.error("Error deleting document:", err);
         alert("Failed to delete application.");
@@ -246,7 +238,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
             <h1 className="text-3xl font-bold text-brand-blue-dark">Admin Dashboard</h1>
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <span className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-              Event-Driven Sync
+              Firestore Live
             </span>
           </div>
           <div className="flex items-center space-x-4">
@@ -330,7 +322,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                         {filteredApps.length === 0 ? (
                             <tr>
                                 <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                                    No applications found locally.
+                                    No applications found.
                                 </td>
                             </tr>
                         ) : (
@@ -357,13 +349,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                         {app.status === 'Pending' && (
                                             <div className="flex space-x-2">
                                                 <button 
-                                                    onClick={() => updateStatus(app.id, 'Approved')} 
+                                                    onClick={() => updateStatus(app.id, 'Approved', app.email, app.name, app.loanAmount)} 
                                                     className="text-green-600 hover:text-green-900"
                                                 >
                                                     Approve
                                                 </button>
                                                 <button 
-                                                    onClick={() => updateStatus(app.id, 'Rejected')} 
+                                                    onClick={() => updateStatus(app.id, 'Rejected', app.email, app.name, app.loanAmount)} 
                                                     className="text-red-600 hover:text-red-900"
                                                 >
                                                     Reject
