@@ -1,4 +1,3 @@
-
 import React, { useState, FormEvent, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
@@ -61,9 +60,10 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     const { x, y } = getCanvasCoordinates(e, canvas);
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3; // Thicker line for better visibility
+    ctx.lineCap = 'round'; // Smooth ends
+    ctx.lineJoin = 'round'; // Smooth corners
+    ctx.strokeStyle = '#1a648a'; // Brand blue color
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -190,7 +190,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- EMAIL LOGIC HELPERS ---
   const getEmailUrls = () => {
-    const recipient = "a-alendingservices@gmail.com";
+    const recipient = "aalendingsevices@gmail.com";
     const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
     
     const bodyContent = `
@@ -526,14 +526,32 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
                       </div>
 
                       {/* Client Signature Section */}
-                      <div className="border-t border-gray-200 pt-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Client Signature</label>
-                        <div className="bg-white border border-gray-300 rounded-md overflow-hidden relative">
-                          <canvas 
+                      <div className="border-t border-gray-200 pt-6">
+                        <div className="flex justify-between items-center mb-3">
+                            <label className="block text-sm font-medium text-gray-700">Client Signature</label>
+                            <button
+                                type="button"
+                                onClick={clearSignature}
+                                className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors flex items-center gap-1"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                </svg>
+                                Clear
+                            </button>
+                        </div>
+                        <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl overflow-hidden relative group hover:border-brand-blue transition-colors">
+                          {/* Placeholder Text */}
+                          {!isDrawing && !formData.signature && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                                  <span className="text-gray-400 text-lg font-medium">Sign Here</span>
+                              </div>
+                          )}
+                          <canvas
                             ref={canvasRef}
                             width={600}
                             height={200}
-                            className="w-full h-48 touch-none bg-white cursor-crosshair"
+                            className="w-full h-48 touch-none bg-transparent cursor-crosshair relative z-10"
                             onMouseDown={startDrawing}
                             onMouseMove={draw}
                             onMouseUp={stopDrawing}
@@ -542,15 +560,13 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
                             onTouchMove={draw}
                             onTouchEnd={stopDrawing}
                           />
-                          <button 
-                            type="button" 
-                            onClick={clearSignature}
-                            className="absolute top-2 right-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded border border-gray-300"
-                          >
-                            Clear
-                          </button>
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Please sign in the box above.</p>
+                        <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                            </svg>
+                            Please draw your signature in the box above.
+                        </p>
                         {errors.signature && <p className="text-red-500 text-xs mt-1">{errors.signature}</p>}
                       </div>
 
