@@ -245,24 +245,32 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       console.log("Action B Complete: Data saved to Firestore.");
       
       // --- ACTION A: NOTIFICATION (EmailJS) ---
-      // IMPORTANT: Replace placeholders below with your actual EmailJS IDs
+      // IMPORTANT: These keys are from your configuration
       const emailParams = {
-        to_email: 'aalendingservices@gmail.com',
-        from_name: formData.name,
+        user_name: formData.name,        // Mapped to standard EmailJS template variable
+        user_email: formData.email,      // Mapped to standard EmailJS template variable
+        phone_number: formData.phone,    // Mapped to standard EmailJS template variable
+        loan_amount: formData.loanAmount, // Mapped to standard EmailJS template variable
+        message: `
+          New Application Received.
+          Student ID: ${formData.schoolId}
+          Course: ${formData.course}
+          Address: ${formData.address}
+          Purpose: ${formData.loanPurpose}
+          Method: ${formData.disbursementMethod} (${formData.walletNumber || 'N/A'})
+        `,
+        // Also passing these as direct matches if your template uses specific custom names
         student_id: formData.schoolId,
         amount: formData.loanAmount,
         purpose: formData.loanPurpose,
-        phone: formData.phone,
-        date: new Date().toLocaleDateString(),
-        message: `New Application Received.\nCourse: ${formData.course}\nMethod: ${formData.disbursementMethod} (${formData.walletNumber || 'N/A'})\nAddress: ${formData.address}`,
       };
 
       try {
         await emailjs.send(
-          'YOUR_SERVICE_ID',   // <-- REPLACE THIS (e.g., service_xyz)
-          'YOUR_TEMPLATE_ID',  // <-- REPLACE THIS (e.g., template_abc)
+          'service_s8z8tr4',   // YOUR SERVICE ID
+          'template_ho8kor7',  // YOUR TEMPLATE ID
           emailParams,
-          'YOUR_PUBLIC_KEY'    // <-- REPLACE THIS (e.g., user_12345)
+          'Qs4emMBTdTNhLwKzR'    // YOUR PUBLIC KEY
         );
         console.log("Action A Complete: Email notification sent.");
       } catch (emailError) {
