@@ -190,7 +190,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- EMAIL LOGIC HELPERS ---
   const getEmailUrls = () => {
-    const recipient = "aalendingsevices@gmail.com";
+    const recipient = "aalendingservices@gmail.com";
     const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
     
     const bodyContent = `
@@ -342,7 +342,7 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done!</h3>
-              <p className="text-gray-600 mb-6">We have prepared your application. Opening Gmail to continue...</p>
+              <p className="text-gray-600 mb-6">We have prepared your application. Your email client should be opening...</p>
               
               <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md mb-8 text-left" role="alert">
                   <p className="font-bold mb-1">⚠️ Important Next Step:</p>
