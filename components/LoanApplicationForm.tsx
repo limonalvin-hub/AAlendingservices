@@ -103,7 +103,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   };
 
   const validatePhone = (phone: string) => {
-    // PH mobile number format: starts with 09 and has 11 digits total
     return /^09\d{9}$/.test(phone);
   };
 
@@ -189,6 +188,55 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
+  // --- EMAIL LOGIC HELPERS ---
+  const getEmailUrls = () => {
+    const recipient = "a-alendingservices@gmail.com";
+    const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
+    
+    const bodyContent = `
+APPLICATION DETAILS
+------------------
+Name: ${formData.name}
+School ID: ${formData.schoolId}
+Course: ${formData.course}
+Address: ${formData.address}
+Phone: ${formData.phone}
+Email: ${formData.email}
+
+LOAN DETAILS
+------------------
+Amount: ₱${formData.loanAmount}
+Purpose: ${formData.loanPurpose}
+Disbursement Method: ${formData.disbursementMethod}
+Wallet Number: ${formData.walletNumber || 'N/A'}
+
+IMPORTANT:
+Please attach your scanned Certificate of Registration (COR) and School ID to this email before sending.
+    `;
+    
+    const body = encodeURIComponent(bodyContent);
+    const mailto = `mailto:${recipient}?subject=${subject}&body=${body}`;
+    const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}&body=${body}`;
+    
+    return { mailto, gmail };
+  };
+
+  const handleAutoRedirect = () => {
+    const { mailto, gmail } = getEmailUrls();
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      window.location.href = mailto;
+    } else {
+      // Desktop: Try Gmail Web first in new tab
+      const newWindow = window.open(gmail, '_blank');
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+         // Fallback if blocked
+         window.location.href = mailto;
+      }
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -239,51 +287,24 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         signature: formData.signature 
       };
 
-      // Try to save to Firestore first
-      try {
-        await addDoc(collection(db, "applications"), applicationData);
-        console.log("Application saved to Firestore");
-      } catch (dbError) {
-        console.error("Firestore save failed:", dbError);
-        // Continue to email redirect even if DB fails, so user can still submit manually
-        alert("Note: We encountered an issue saving to the database, but we will proceed to open your email client for manual submission.");
-      }
+      // 5-second timeout race condition to prevent hanging
+      const saveToDb = addDoc(collection(db, "applications"), applicationData);
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
 
-      // --- 2. REDIRECT TO GMAIL (User Submission) ---
-      const recipient = "aalendingservices@gmail.com";
-      const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
-      
-      const body = encodeURIComponent(`
-APPLICATION DETAILS
-------------------
-Name: ${formData.name}
-School ID: ${formData.schoolId}
-Course: ${formData.course}
-Address: ${formData.address}
-Phone: ${formData.phone}
-Email: ${formData.email}
-
-LOAN DETAILS
-------------------
-Amount: ₱${formData.loanAmount}
-Purpose: ${formData.loanPurpose}
-Disbursement Method: ${formData.disbursementMethod}
-Wallet Number: ${formData.walletNumber || 'N/A'}
-
-IMPORTANT:
-Please attach your scanned Certificate of Registration (COR) and School ID to this email before sending.
-      `);
-
-      // Open default mail client
-      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
-
-      setIsSubmitted(true);
+      await Promise.race([saveToDb, timeout]);
+      console.log("Application saved to Firestore");
       
     } catch (err) {
-      console.error("Unexpected error:", err);
-      alert("An unexpected error occurred. Please try again.");
+      console.error("Submission warning (Database):", err);
+      // We swallow the error so the user can still proceed to email submission
     } finally {
       setIsSubmitting(false);
+      setIsSubmitted(true);
+      
+      // Delay redirect slightly to allow UI to update
+      setTimeout(() => {
+        handleAutoRedirect();
+      }, 800);
     }
   };
 
@@ -321,23 +342,43 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done!</h3>
-              <p className="text-gray-600 mb-6">We have processed your details. Your email client should have opened.</p>
+              <p className="text-gray-600 mb-6">We have prepared your application. Your email client should be opening...</p>
               
               <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md mb-8 text-left" role="alert">
                   <p className="font-bold mb-1">⚠️ Important Next Step:</p>
-                  <p>Please check the email draft that just opened. You <strong>MUST attach</strong> your School ID and COR files manually before sending the email.</p>
+                  <p>Please check the email draft. You <strong>MUST attach</strong> your School ID and COR files manually before clicking Send.</p>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
+              {/* FALLBACK BUTTONS */}
+              <div className="flex flex-col gap-3 mb-8 max-w-sm mx-auto">
+                 <p className="text-sm text-gray-500 mb-1">If the email didn't open automatically:</p>
+                 <a 
+                    href={getEmailUrls().gmail} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 w-full flex items-center justify-center gap-2"
+                 >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
+                    Open in Gmail (Web)
+                 </a>
+                 <a 
+                    href={getEmailUrls().mailto}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition duration-300 w-full"
+                 >
+                    Open Default Email App
+                 </a>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8 border-t pt-6">
                 <button
                   onClick={handleNewApplication}
-                  className="bg-brand-green hover:bg-brand-green-light text-white font-bold py-3 px-6 rounded-lg transition duration-300 w-full sm:w-auto"
+                  className="text-brand-blue font-semibold hover:underline"
                 >
-                  New Application
+                  Start New Application
                 </button>
                  <button
                   onClick={onBack}
-                  className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 w-full sm:w-auto"
+                  className="text-gray-500 font-semibold hover:text-gray-700 hover:underline"
                 >
                   Back to Home
                 </button>
