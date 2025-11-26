@@ -1,6 +1,7 @@
 
 import React, { useState, FormEvent, useRef } from 'react';
-import emailjs from '@emailjs/browser';
+import { db } from '../firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -219,9 +220,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     setIsSubmitting(true);
 
     try {
-      // --- ACTION: SAVE TO LOCAL STORAGE (Simulated DB for Admin Panel) ---
-      const newApplication = {
-        id: Date.now().toString(),
+      // --- 1. SAVE TO FIRESTORE (Admin Panel Sync) ---
+      const applicationData = {
         date: new Date().toISOString(),
         status: 'Pending',
         name: formData.name,
@@ -239,53 +239,49 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         signature: formData.signature 
       };
 
-      const existingApps = JSON.parse(localStorage.getItem('loanApplications') || '[]');
-      const updatedApps = [newApplication, ...existingApps];
-      localStorage.setItem('loanApplications', JSON.stringify(updatedApps));
-      
-      // --- REAL-TIME BROADCAST ---
-      // Instead of relying on polling, we use the Broadcast Channel API
-      // to instantly notify the Admin Panel tab (if open) about the new data.
-      const syncChannel = new BroadcastChannel('app_sync_channel');
-      syncChannel.postMessage({ type: 'NEW_APPLICATION_SUBMITTED' });
-      syncChannel.close();
+      // Try to save to Firestore first
+      try {
+        await addDoc(collection(db, "applications"), applicationData);
+        console.log("Application saved to Firestore");
+      } catch (dbError) {
+        console.error("Firestore save failed:", dbError);
+        // Continue to email redirect even if DB fails, so user can still submit manually
+        alert("Note: We encountered an issue saving to the database, but we will proceed to open your email client for manual submission.");
+      }
 
-      // --- ACTION: SEND EMAIL VIA EMAILJS ---
-      const emailParams = {
-        user_name: formData.name,        
-        user_email: formData.email,      
-        phone_number: formData.phone,    
-        loan_amount: formData.loanAmount,
-        message: `
-          New Application Received.
-          Student ID: ${formData.schoolId}
-          Course: ${formData.course}
-          Address: ${formData.address}
-          Purpose: ${formData.loanPurpose}
-          Method: ${formData.disbursementMethod} (${formData.walletNumber || 'N/A'})
-        `,
-        student_id: formData.schoolId,
-        amount: formData.loanAmount,
-        purpose: formData.loanPurpose,
-      };
-
-      await emailjs.send(
-        'service_s8z8tr4',   // YOUR SERVICE ID
-        'template_ho8kor7',  // YOUR TEMPLATE ID
-        emailParams,
-        'Qs4emMBTdTNhLwKzR'    // YOUR PUBLIC KEY
-      );
+      // --- 2. REDIRECT TO GMAIL (User Submission) ---
+      const recipient = "aalendingservices@gmail.com";
+      const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
       
-      console.log("Application submitted via EmailJS");
+      const body = encodeURIComponent(`
+APPLICATION DETAILS
+------------------
+Name: ${formData.name}
+School ID: ${formData.schoolId}
+Course: ${formData.course}
+Address: ${formData.address}
+Phone: ${formData.phone}
+Email: ${formData.email}
+
+LOAN DETAILS
+------------------
+Amount: ₱${formData.loanAmount}
+Purpose: ${formData.loanPurpose}
+Disbursement Method: ${formData.disbursementMethod}
+Wallet Number: ${formData.walletNumber || 'N/A'}
+
+IMPORTANT:
+Please attach your scanned Certificate of Registration (COR) and School ID to this email before sending.
+      `);
+
+      // Open default mail client
+      window.location.href = `mailto:${recipient}?subject=${subject}&body=${body}`;
+
       setIsSubmitted(true);
       
     } catch (err) {
-      console.error("Error submitting application: ", err);
-      // Fallback: If EmailJS fails, we still consider it submitted locally
-      if (!isSubmitted) {
-         alert("Application saved locally, but email notification failed. Please check your connection.");
-         setIsSubmitted(true);
-      }
+      console.error("Unexpected error:", err);
+      alert("An unexpected error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -324,12 +320,14 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Received!</h3>
-              <p className="text-gray-600 mb-6">Your loan application has been successfully sent to our team via email.</p>
-              <div className="bg-blue-50 border-l-4 border-brand-blue text-brand-blue-dark p-4 rounded-md mb-8" role="alert">
-                  <p className="font-bold">What happens next?</p>
-                  <p>Our admins will review your details. You may be contacted via email or phone for further verification.</p>
+              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done!</h3>
+              <p className="text-gray-600 mb-6">We have processed your details. Your email client should have opened.</p>
+              
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md mb-8 text-left" role="alert">
+                  <p className="font-bold mb-1">⚠️ Important Next Step:</p>
+                  <p>Please check the email draft that just opened. You <strong>MUST attach</strong> your School ID and COR files manually before sending the email.</p>
               </div>
+
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
                 <button
                   onClick={handleNewApplication}
