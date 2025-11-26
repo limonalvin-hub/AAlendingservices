@@ -33,7 +33,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   const [error, setError] = useState('');
   const [applications, setApplications] = useState<LoanApplication[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>('All');
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   // AUTH CONSTANT
   const REQUIRED_EMAIL = "aalendingservices@gmail.com";
@@ -85,14 +84,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('adminAuth');
     onBack();
-  };
-
-  const toggleMaintenanceMode = () => {
-    const newStatus = !maintenanceMode;
-    setMaintenanceMode(newStatus);
-    // Note: Maintenance mode is currently local state/storage. 
-    // To make this global across users, we would need to save it to Firestore too.
-    localStorage.setItem('allowance_aid_maintenance_mode', String(newStatus));
   };
 
   const updateStatus = async (id: string, newStatus: string) => {

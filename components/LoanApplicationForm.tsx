@@ -1,3 +1,4 @@
+
 import React, { useState, FormEvent, useRef } from 'react';
 import { db } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
@@ -219,10 +220,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     setIsSubmitting(true);
 
-    // --- 1. FIREBASE DB SUBMISSION (Action B: Storage) ---
-    // This logic connects to the Firestore database initialized in firebaseConfig.ts
-    // It creates a new document in the 'applications' collection.
     try {
+      // --- ACTION B: STORAGE (Firebase Firestore) ---
       const newApplication = {
         date: new Date().toISOString(),
         status: 'Pending',
@@ -238,45 +237,44 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         walletNumber: formData.walletNumber,
         corFileName: formData.corFile ? formData.corFile.name : 'Not attached',
         schoolIdFileName: formData.schoolIdFile ? formData.schoolIdFile.name : 'Not attached',
-        signature: formData.signature // Saving base64 signature string directly
+        signature: formData.signature 
       };
 
+      // Save to 'applications' collection
       await addDoc(collection(db, "applications"), newApplication);
-      console.log("Document successfully written to Firestore!");
+      console.log("Action B Complete: Data saved to Firestore.");
       
-      // --- 2. EMAIL NOTIFICATION (Action A: Notification) ---
-      // This sends the data to your Gmail via EmailJS.
-      // IMPORTANT: Update these IDs with your actual EmailJS credentials.
-      
+      // --- ACTION A: NOTIFICATION (EmailJS) ---
+      // IMPORTANT: Replace placeholders below with your actual EmailJS IDs
       const emailParams = {
-        to_email: 'aalendingservices@gmail.com', // Target admin email
+        to_email: 'aalendingservices@gmail.com',
         from_name: formData.name,
         student_id: formData.schoolId,
         amount: formData.loanAmount,
         purpose: formData.loanPurpose,
         phone: formData.phone,
         date: new Date().toLocaleDateString(),
-        message: `New Loan Application.\nCourse: ${formData.course}\nMethod: ${formData.disbursementMethod} (${formData.walletNumber})\nAddress: ${formData.address}`,
+        message: `New Application Received.\nCourse: ${formData.course}\nMethod: ${formData.disbursementMethod} (${formData.walletNumber || 'N/A'})\nAddress: ${formData.address}`,
       };
 
       try {
         await emailjs.send(
-          'YOUR_SERVICE_ID',   // Replace with your EmailJS Service ID
-          'YOUR_TEMPLATE_ID',  // Replace with your EmailJS Template ID
+          'YOUR_SERVICE_ID',   // <-- REPLACE THIS (e.g., service_xyz)
+          'YOUR_TEMPLATE_ID',  // <-- REPLACE THIS (e.g., template_abc)
           emailParams,
-          'YOUR_PUBLIC_KEY'    // Replace with your EmailJS Public Key
+          'YOUR_PUBLIC_KEY'    // <-- REPLACE THIS (e.g., user_12345)
         );
-        console.log("Email notification sent successfully.");
+        console.log("Action A Complete: Email notification sent.");
       } catch (emailError) {
         console.error("Failed to send email notification:", emailError);
-        // Note: We don't block the success UI if email fails, as the DB save is the priority.
+        // We do not fail the whole process if email fails, as DB save is critical
       }
 
       setIsSubmitted(true);
       
     } catch (err) {
-      console.error("Error writing document to Firestore: ", err);
-      alert("There was an error submitting your application. Please check your internet connection and try again.");
+      console.error("Error submitting application: ", err);
+      alert("There was an error submitting your application. Please check your internet connection.");
     } finally {
       setIsSubmitting(false);
     }
