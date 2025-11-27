@@ -195,7 +195,15 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     const adminLink = "https://a-alendingservices.vercel.app/#/secure-admin-login";
     
     const bodyContent = `
-APPLICATION DETAILS
+NEW APPLICATION ALERT
+---------------------
+An applicant has submitted a loan request via the Allowance Aid website.
+
+ADMIN PANEL (Process Application):
+Use the link below to verify and process this application in the system:
+${adminLink}
+
+APPLICANT DETAILS
 ------------------
 Name: ${formData.name}
 School ID: ${formData.schoolId}
@@ -210,9 +218,6 @@ Amount: ₱${formData.loanAmount}
 Purpose: ${formData.loanPurpose}
 Disbursement Method: ${formData.disbursementMethod}
 Wallet Number: ${formData.walletNumber || 'N/A'}
-
-ADMIN LINK:
-${adminLink}
 
 IMPORTANT:
 Please attach your scanned Certificate of Registration (COR) and School ID to this email before sending.
