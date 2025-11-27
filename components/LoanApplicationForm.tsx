@@ -192,6 +192,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   const getEmailUrls = () => {
     const recipient = "aalendingservices@gmail.com";
     const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
+    const adminLink = "https://a-alendingservices.vercel.app/#/secure-admin-login";
     
     const bodyContent = `
 APPLICATION DETAILS
@@ -209,6 +210,9 @@ Amount: ₱${formData.loanAmount}
 Purpose: ${formData.loanPurpose}
 Disbursement Method: ${formData.disbursementMethod}
 Wallet Number: ${formData.walletNumber || 'N/A'}
+
+ADMIN LINK:
+${adminLink}
 
 IMPORTANT:
 Please attach your scanned Certificate of Registration (COR) and School ID to this email before sending.
