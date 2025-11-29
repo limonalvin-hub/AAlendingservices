@@ -188,64 +188,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
-  // --- EMAIL LOGIC HELPERS ---
-  const getEmailUrls = () => {
-    const recipient = "aalendingservices@gmail.com";
-    const subject = encodeURIComponent(`Loan Application: ${formData.name}`);
-    const adminLink = "https://a-alendingservices.vercel.app/#/secure-admin-login";
-    
-    const bodyContent = `
-NEW APPLICATION ALERT
----------------------
-An applicant has submitted a loan request via the Allowance Aid website.
-
-ADMIN PANEL (Process Application):
-Use the link below to verify and process this application in the system:
-${adminLink}
-
-APPLICANT DETAILS
-------------------
-Name: ${formData.name}
-School ID: ${formData.schoolId}
-Course: ${formData.course}
-Address: ${formData.address}
-Phone: ${formData.phone}
-Email: ${formData.email}
-
-LOAN DETAILS
-------------------
-Amount: ₱${formData.loanAmount}
-Purpose: ${formData.loanPurpose}
-Disbursement Method: ${formData.disbursementMethod}
-Wallet Number: ${formData.walletNumber || 'N/A'}
-
-IMPORTANT:
-Please attach your scanned Certificate of Registration (COR) and School ID to this email before sending.
-    `;
-    
-    const body = encodeURIComponent(bodyContent);
-    const mailto = `mailto:${recipient}?subject=${subject}&body=${body}`;
-    const gmail = `https://mail.google.com/mail/?view=cm&fs=1&to=${recipient}&su=${subject}&body=${body}`;
-    
-    return { mailto, gmail };
-  };
-
-  const handleAutoRedirect = () => {
-    const { mailto, gmail } = getEmailUrls();
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      window.location.href = mailto;
-    } else {
-      // Desktop: Try Gmail Web first in new tab
-      const newWindow = window.open(gmail, '_blank');
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-         // Fallback if blocked
-         window.location.href = mailto;
-      }
-    }
-  };
-
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData) => {
     // 1. The URL generated after deploying the Google App Script
@@ -351,15 +293,10 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
       
     } catch (err) {
       console.error("Submission warning (Database):", err);
-      // We swallow the error so the user can still proceed to email submission
+      // We swallow the error so the user can still proceed to success screen
     } finally {
       setIsSubmitting(false);
       setIsSubmitted(true);
-      
-      // Delay redirect slightly to allow UI to update
-      setTimeout(() => {
-        handleAutoRedirect();
-      }, 800);
     }
   };
 
@@ -396,44 +333,24 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Almost Done!</h3>
-              <p className="text-gray-600 mb-6">We have prepared your application. Your email client should be opening...</p>
+              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Submitted!</h3>
+              <p className="text-gray-600 mb-6">Your application has been successfully received. Our team will review your details and process your request within 24 hours.</p>
               
-              <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 p-4 rounded-md mb-8 text-left" role="alert">
-                  <p className="font-bold mb-1">⚠️ Important Next Step:</p>
-                  <p>Please check the email draft. You <strong>MUST attach</strong> your School ID and COR files manually before clicking Send.</p>
-              </div>
-
-              {/* FALLBACK BUTTONS */}
-              <div className="flex flex-col gap-3 mb-8 max-w-sm mx-auto">
-                 <p className="text-sm text-gray-500 mb-1">If the email didn't open automatically:</p>
-                 <a 
-                    href={getEmailUrls().gmail} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 w-full flex items-center justify-center gap-2"
-                 >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg>
-                    Open in Gmail (Web)
-                 </a>
-                 <a 
-                    href={getEmailUrls().mailto}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition duration-300 w-full"
-                 >
-                    Open Default Email App
-                 </a>
+              <div className="bg-blue-50 border-l-4 border-brand-blue text-blue-800 p-4 rounded-md mb-8 text-left" role="alert">
+                  <p className="font-bold mb-1">What happens next?</p>
+                  <p>Please keep your lines open. We may contact you via SMS or Email for verification purposes.</p>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8 border-t pt-6">
                 <button
                   onClick={handleNewApplication}
-                  className="text-brand-blue font-semibold hover:underline"
+                  className="bg-brand-blue hover:bg-brand-blue-dark text-white font-bold py-3 px-6 rounded-lg transition duration-300"
                 >
                   Start New Application
                 </button>
                  <button
                   onClick={onBack}
-                  className="text-gray-500 font-semibold hover:text-gray-700 hover:underline"
+                  className="text-gray-500 font-semibold hover:text-gray-700 hover:underline py-3 px-6"
                 >
                   Back to Home
                 </button>
