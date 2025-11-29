@@ -1,8 +1,6 @@
 import React, { useState, FormEvent, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import * as firestore from 'firebase/firestore';
-
-const { collection, addDoc } = firestore;
+import { collection, addDoc } from 'firebase/firestore';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -248,6 +246,49 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
     }
   };
 
+  // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
+  const submitLoanApplication = async (data: typeof formData) => {
+    // 1. The URL generated after deploying the Google App Script
+    // Using '/exec' instead of '/dev' ensures the deployed script is accessible.
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwnlsd1jfSAwSF2zhhfHF0bIxaR_Pk6OblXReo9Slkl/exec";
+
+    try {
+      // Determine terms based on amount logic
+      let terms = "1 Week";
+      const amt = parseFloat(data.loanAmount);
+      if (amt >= 300 && amt <= 500) terms = "2 Weeks";
+      if (amt >= 600) terms = "1 Month";
+
+      // 2. Prepare the data object matching the Google Script keys
+      const payload = {
+        fullName: data.name,         
+        contactNumber: data.phone, 
+        emailAddress: data.email,          
+        loanAmount: data.loanAmount,           
+        purposeOfLoan: data.loanPurpose,       
+        paymentTerms: terms           
+      };
+
+      // 3. Send the POST request
+      const response = await fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (result.result === "success") {
+        console.log("Application synced to Google Sheets successfully.");
+        // We use the app's existing UI for success messages instead of alerts.
+      } else {
+        console.error("Google Sheet Sync Error: " + result.error);
+      }
+
+    } catch (error) {
+      console.error("Google Sheet Submission Error:", error);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -277,6 +318,9 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
     }
 
     setIsSubmitting(true);
+
+    // Call Google Sheet sync concurrently
+    submitLoanApplication(formData).catch(err => console.error("Background sync failed", err));
 
     try {
       // --- 1. SAVE TO FIRESTORE (Admin Panel Sync) ---
