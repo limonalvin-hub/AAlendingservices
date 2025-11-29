@@ -247,6 +247,45 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
   };
 
   const handleSubmit = async (e: FormEvent) => {
+    const submitLoanApplication = async (formData) => {
+  // 1. The URL generated after deploying the Google App Script
+  // It looks like: [https://script.google.com/macros/s/AKfycbx.../exec](https://script.google.com/macros/s/AKfycbx.../exec)
+  const SCRIPT_URL = https://script.google.com/macros/s/AKfycbyUwKWa7-3G2spsHnI6Bupfw8xlp7v4qMZOIZJPJypWaIiM8IxTJ1jBQhJlCuSZhsys4g/exec
+
+  try {
+    // 2. Prepare the data object matching the Google Script keys
+    const payload = {
+      fullName: formData.fullName,         // e.g. "Juan Dela Cruz"
+      contactNumber: formData.contactNumber, // e.g. "09171234567"
+      emailAddress: formData.email,          // e.g. "juan@example.com"
+      loanAmount: formData.amount,           // e.g. "50000"
+      purposeOfLoan: formData.purpose,       // e.g. "Business Capital"
+      paymentTerms: formData.terms           // e.g. "6 Months"
+    };
+
+    // 3. Send the POST request
+    // Note: 'no-cors' mode is NOT used here because we want to read the response.
+    // We use standard fetch with a text/plain content type to avoid complex CORS preflights.
+    const response = await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json();
+
+    if (result.result === "success") {
+      alert("Application Submitted! The admin will review your request.");
+      // Optional: Reset form logic here
+    } else {
+      alert("Error submitting application: " + result.error);
+    }
+
+  } catch (error) {
+    console.error("Submission Error:", error);
+    alert("There was a network error. Please try again.");
+  }
+};
+
     e.preventDefault();
     if (isSubmitting) return;
 
