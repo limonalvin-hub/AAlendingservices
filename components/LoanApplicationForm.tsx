@@ -1,6 +1,6 @@
+
 import React, { useState, FormEvent, useRef } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { db, collection, addDoc } from '../firebaseConfig';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -250,7 +250,7 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
   const submitLoanApplication = async (data: typeof formData) => {
     // 1. The URL generated after deploying the Google App Script
     // Using '/exec' instead of '/dev' ensures the deployed script is accessible.
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwnlsd1jfSAwSF2zhhfHF0bIxaR_Pk6OblXReo9Slkl/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWrILXlWnEq0RGicXayzJp6uMDOtNjsGcPazIUWSTuOLlLhedD4_DQpycTrwbMjWhWng/exec";
 
     try {
       // Determine terms based on amount logic

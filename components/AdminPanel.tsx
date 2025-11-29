@@ -1,6 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../firebaseConfig';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { db, collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from '../firebaseConfig';
 import emailjs from '@emailjs/browser';
 
 interface AdminPanelProps {
