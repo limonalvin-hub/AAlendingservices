@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import * as firestore from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
+
+const { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } = firestore;
 
 interface AdminPanelProps {
   onBack: () => void;
