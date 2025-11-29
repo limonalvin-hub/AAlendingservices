@@ -250,7 +250,7 @@ Please attach your scanned Certificate of Registration (COR) and School ID to th
   const submitLoanApplication = async (data: typeof formData) => {
     // 1. The URL generated after deploying the Google App Script
     // Using '/exec' instead of '/dev' ensures the deployed script is accessible.
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWrILXlWnEq0RGicXayzJp6uMDOtNjsGcPazIUWSTuOLlLhedD4_DQpycTrwbMjWhWng/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzL48RAuB3lbGeD3u1EcG43gqBOYGh6wDP9kuhB7pZmYrrRm_KTps2_w_GlS5sazXubTA/exec";
 
     try {
       // Determine terms based on amount logic
