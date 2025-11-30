@@ -1,6 +1,85 @@
 
+/* 
+  === GOOGLE APPS SCRIPT CODE ===
+  Copy and paste the code below into your Google Apps Script project (Extensions > Apps Script in Google Sheets).
+  
+  function doPost(e) {
+    var lock = LockService.getScriptLock();
+    lock.tryLock(10000);
+
+    try {
+      var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+      var data = JSON.parse(e.postData.contents);
+
+      // Helper to save image
+      function saveImage(base64, mime, filename) {
+        if (!base64) return "No File";
+        var decoded = Utilities.base64Decode(base64);
+        var blob = Utilities.newBlob(decoded, mime, filename);
+        var file = DriveApp.createFile(blob);
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        return file.getUrl();
+      }
+
+      var schoolIdUrl = saveImage(data.schoolIdImage, data.schoolIdMime, data.fullName + " - ID");
+      var corUrl = saveImage(data.corImage, data.corMime, data.fullName + " - COR");
+
+      // Append Row
+      // Headers assumed: Timestamp, Full Name, School ID, Course, Address, Phone, Email, Amount, Purpose, School ID Link, COR Link, Status
+      sheet.appendRow([
+        new Date(),
+        data.fullName,
+        data.schoolIdNumber,
+        data.collegeCourse,
+        data.address,
+        data.phoneNumber,
+        data.emailAddress,
+        data.loanAmount,
+        data.purposeOfLoan,
+        schoolIdUrl,
+        corUrl,
+        "Pending"
+      ]);
+      
+      // Optional: Send Email Notification
+      // MailApp.sendEmail("aalendingservices@gmail.com", "New Loan Application", "New applicant: " + data.fullName);
+
+      return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
+    } catch (e) {
+      return ContentService.createTextOutput(JSON.stringify({ result: "error", error: e.toString() })).setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  function doGet(e) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var rows = sheet.getDataRange().getValues();
+    var data = [];
+
+    // Skip header row (i=1)
+    for (var i = 1; i < rows.length; i++) {
+      var row = rows[i];
+      data.push({
+        timestamp: row[0],
+        fullName: row[1],
+        schoolIdNumber: row[2],
+        collegeCourse: row[3],
+        address: row[4],
+        phoneNumber: row[5],
+        emailAddress: row[6],
+        loanAmount: row[7],
+        purposeOfLoan: row[8],
+        schoolIdLink: row[9],
+        corLink: row[10],
+        status: row[11],
+        id: i + 1 // logical ID based on row
+      });
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", data: data })).setMimeType(ContentService.MimeType.JSON);
+  }
+*/
+
 import React, { useState, FormEvent, useRef } from 'react';
-import { db, collection, addDoc } from '../firebaseConfig';
 
 interface LoanApplicationFormProps {
   onBack: () => void;
@@ -208,7 +287,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxNCNObA8SY9SNGT16FsZeNSO_LmePxlHTD0QqI_wCpvrsLNldV35Xn-fD1MpCcRio/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrk7rTsK8sdzbTZEJf__1ao-XweOMl0dKouSgx428baE5QT-ZHRdo8WPmE55oFx8ETOQ/exec";
 
     try {
       // 2. Prepare the data object matching the Google Script keys
@@ -249,10 +328,12 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       if (result.result !== "success") {
         console.error("Google Sheet Sync Error: " + result.error);
+        throw new Error(result.error);
       }
 
     } catch (error) {
       console.error("Google Sheet Submission Error:", error);
+      throw error; // Re-throw to handle in UI
     }
   };
 
@@ -293,47 +374,16 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       if (formData.schoolIdFile) schoolIdBase64 = await convertToBase64(formData.schoolIdFile);
       if (formData.corFile) corBase64 = await convertToBase64(formData.corFile);
 
-      // 2. Call Google Sheet sync concurrently using the prepared Base64
-      submitLoanApplication(formData, schoolIdBase64, corBase64).catch(err => console.error("Background sync failed", err));
-
-      // 3. SAVE TO FIRESTORE (Admin Panel Sync)
-      // Note: Storing full base64 images in Firestore has a 1MB limit. 
-      // If images are large, this might fail. Ideally use Firebase Storage, but this is a quick fix.
-      const applicationData = {
-        date: new Date().toISOString(),
-        status: 'Pending',
-        name: formData.name,
-        schoolId: formData.schoolId,
-        course: formData.course,
-        address: formData.address,
-        phone: formData.phone,
-        email: formData.email,
-        loanPurpose: formData.loanPurpose,
-        loanAmount: formData.loanAmount,
-        disbursementMethod: formData.disbursementMethod,
-        walletNumber: formData.walletNumber,
-        corFileName: formData.corFile ? formData.corFile.name : 'Not attached',
-        schoolIdFileName: formData.schoolIdFile ? formData.schoolIdFile.name : 'Not attached',
-        // Saving the actual image data so Admin Panel can view it
-        corImage: corBase64,
-        corMime: formData.corFile ? formData.corFile.type : '',
-        schoolIdImage: schoolIdBase64,
-        schoolIdMime: formData.schoolIdFile ? formData.schoolIdFile.type : '',
-        signature: formData.signature 
-      };
-
-      // 5-second timeout race condition to prevent hanging
-      const saveToDb = addDoc(collection(db, "applications"), applicationData);
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
-
-      await Promise.race([saveToDb, timeout]);
+      // 2. Call Google Sheet sync
+      await submitLoanApplication(formData, schoolIdBase64, corBase64);
+      
+      setIsSubmitted(true);
       
     } catch (err) {
-      console.error("Submission warning (Database/Image Processing):", err);
-      // NOTE: If you see this error, ensure firebaseConfig.ts has valid credentials and images aren't too large.
+      console.error("Submission failed:", err);
+      alert("Submission failed. Please check your internet connection or try again later.");
     } finally {
       setIsSubmitting(false);
-      setIsSubmitted(true);
     }
   };
 
