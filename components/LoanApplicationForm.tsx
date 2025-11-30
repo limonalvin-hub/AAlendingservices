@@ -207,7 +207,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVE8IrcRUrSE3P-0YhUoMa1GKQ00OQB8dQsRy38qRB9TfXc69N6UElLr-BjZ2lySTB2w/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsHQS23QzMXJyHq1sz1xC32cG1iPDw8bihX_lV5seY/exec";
 
     try {
       // 1. Convert images
@@ -216,12 +216,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       if (data.schoolIdFile) schoolIdBase64 = await convertToBase64(data.schoolIdFile);
       if (data.corFile) corBase64 = await convertToBase64(data.corFile);
-
-      // Determine terms based on amount logic (optional but helpful context)
-      let terms = "1 Week";
-      const amt = parseFloat(data.loanAmount);
-      if (amt >= 300 && amt <= 500) terms = "2 Weeks";
-      if (amt >= 600) terms = "1 Month";
 
       // 2. Prepare the data object matching the Google Script keys
       const payload = {
@@ -236,7 +230,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         // Loan Details
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
-        paymentTerms: terms, // Included for context
 
         // Images
         schoolIdImage: schoolIdBase64,
