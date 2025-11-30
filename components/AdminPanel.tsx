@@ -6,23 +6,21 @@ interface AdminPanelProps {
   onBack: () => void;
 }
 
-// Updated interface to match Google Sheet structure
+// Updated interface to match the new Google Sheet structure (Columns as Keys)
 interface LoanApplication {
   id: string; 
-  timestamp: string; // From GAS row[0]
-  status: string; // From GAS row[11]
-  fullName: string; // row[1]
-  schoolIdNumber: string; // row[2]
-  collegeCourse: string; // row[3]
-  address: string; // row[4]
-  phoneNumber: string; // row[5]
-  emailAddress: string; // row[6]
-  loanAmount: string; // row[7]
-  purposeOfLoan: string; // row[8]
-  schoolIdLink: string; // row[9] - Google Drive Link
-  corLink: string; // row[10] - Google Drive Link
-  // disbursementMethod and walletNumber might not be in the current script payload unless added, 
-  // currently we map what is provided in the GAS spec.
+  timestamp: string;      // "Timestamp"
+  status: string;         // "Status"
+  fullName: string;       // "Full Name"
+  schoolIdNumber: string; // "School ID Number"
+  collegeCourse: string;  // "College Course"
+  address: string;        // "Address"
+  phoneNumber: string;    // "Phone Number"
+  emailAddress: string;   // "Email Address"
+  loanAmount: string;     // "Loan Amount"
+  purposeOfLoan: string;  // "Purpose"
+  schoolIdLink: string;   // "School ID Link"
+  corLink: string;        // "COR Link"
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
@@ -37,9 +35,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
   // AUTH CONSTANT
   const REQUIRED_EMAIL = "aalendingservices@gmail.com";
   
-  // Google Apps Script URL
-  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrk7rTsK8sdzbTZEJf__1ao-XweOMl0dKouSgx428baE5QT-ZHRdo8WPmE55oFx8ETOQ/exec";
-
+  // Google Apps Script URL - REPLACE WITH NEW DEPLOYMENT URL
+  const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
   useEffect(() => {
     // Session persistence for refreshing
     const sessionAuth = sessionStorage.getItem('adminAuth');
@@ -58,9 +55,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         const result = await response.json();
         
         if (result.status === "success") {
-            // Map the data to our interface if keys match, otherwise manually map
-            // The script returns: { status: "success", data: [ { timestamp, fullName... } ] }
-            setApplications(result.data.reverse()); // Reverse to show newest first
+            // Map the Key-Value Pair data from the new script to our React Interface
+            const mappedData: LoanApplication[] = result.data.map((item: any, index: number) => ({
+                id: String(index),
+                timestamp: item["Timestamp"] || "",
+                status: item["Status"] || "Pending",
+                fullName: item["Full Name"] || "",
+                schoolIdNumber: item["School ID Number"] || "",
+                collegeCourse: item["College Course"] || "",
+                address: item["Address"] || "",
+                phoneNumber: item["Phone Number"] || "",
+                emailAddress: item["Email Address"] || "",
+                loanAmount: item["Loan Amount"] || "",
+                purposeOfLoan: item["Purpose"] || "",
+                schoolIdLink: item["School ID Link"] || "",
+                corLink: item["COR Link"] || ""
+            }));
+
+            setApplications(mappedData.reverse()); // Reverse to show newest first
         } else {
             console.error("API returned error:", result);
         }
@@ -94,9 +106,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
     onBack();
   };
 
-  // NOTE: Since Google Sheets is the database, we cannot easily update rows via a simple fetch call 
-  // unless we implement a specific 'update' action in the GAS doPost.
-  // For now, we will alert the user to update the sheet directly.
+  // NOTE: Status updates are handled directly in Google Sheets via the onEdit trigger in the script.
   const handleStatusUpdateAttempt = () => {
       alert("Please update the status directly in the Google Sheet linked to your Script. The changes will reflect here after you refresh.");
       window.open("https://docs.google.com/spreadsheets/u/0/", "_blank");
@@ -322,14 +332,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center">
                                             <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-brand-blue to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                                                {app.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                                {app.fullName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
                                             </div>
                                             <div className="ml-4">
                                                 <div className="text-sm font-bold text-gray-900">{app.fullName}</div>
                                                 <div className="text-xs text-gray-500 flex items-center gap-1">
                                                     <span>ID: {app.schoolIdNumber}</span>
                                                     <span className="text-gray-300">•</span>
-                                                    <span>{new Date(app.timestamp).toLocaleDateString()}</span>
+                                                    <span>{app.timestamp ? new Date(app.timestamp).toLocaleDateString() : 'N/A'}</span>
                                                 </div>
                                                 <div className="text-xs text-gray-500 font-semibold mt-1 flex items-center gap-1">
                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">

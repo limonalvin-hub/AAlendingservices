@@ -1,84 +1,3 @@
-
-/* 
-  === GOOGLE APPS SCRIPT CODE ===
-  Copy and paste the code below into your Google Apps Script project (Extensions > Apps Script in Google Sheets).
-  
-  function doPost(e) {
-    var lock = LockService.getScriptLock();
-    lock.tryLock(10000);
-
-    try {
-      var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-      var data = JSON.parse(e.postData.contents);
-
-      // Helper to save image
-      function saveImage(base64, mime, filename) {
-        if (!base64) return "No File";
-        var decoded = Utilities.base64Decode(base64);
-        var blob = Utilities.newBlob(decoded, mime, filename);
-        var file = DriveApp.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        return file.getUrl();
-      }
-
-      var schoolIdUrl = saveImage(data.schoolIdImage, data.schoolIdMime, data.fullName + " - ID");
-      var corUrl = saveImage(data.corImage, data.corMime, data.fullName + " - COR");
-
-      // Append Row
-      // Headers assumed: Timestamp, Full Name, School ID, Course, Address, Phone, Email, Amount, Purpose, School ID Link, COR Link, Status
-      sheet.appendRow([
-        new Date(),
-        data.fullName,
-        data.schoolIdNumber,
-        data.collegeCourse,
-        data.address,
-        data.phoneNumber,
-        data.emailAddress,
-        data.loanAmount,
-        data.purposeOfLoan,
-        schoolIdUrl,
-        corUrl,
-        "Pending"
-      ]);
-      
-      // Optional: Send Email Notification
-      // MailApp.sendEmail("aalendingservices@gmail.com", "New Loan Application", "New applicant: " + data.fullName);
-
-      return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
-    } catch (e) {
-      return ContentService.createTextOutput(JSON.stringify({ result: "error", error: e.toString() })).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-
-  function doGet(e) {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var rows = sheet.getDataRange().getValues();
-    var data = [];
-
-    // Skip header row (i=1)
-    for (var i = 1; i < rows.length; i++) {
-      var row = rows[i];
-      data.push({
-        timestamp: row[0],
-        fullName: row[1],
-        schoolIdNumber: row[2],
-        collegeCourse: row[3],
-        address: row[4],
-        phoneNumber: row[5],
-        emailAddress: row[6],
-        loanAmount: row[7],
-        purposeOfLoan: row[8],
-        schoolIdLink: row[9],
-        corLink: row[10],
-        status: row[11],
-        id: i + 1 // logical ID based on row
-      });
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", data: data })).setMimeType(ContentService.MimeType.JSON);
-  }
-*/
-
 import React, { useState, FormEvent, useRef } from 'react';
 
 interface LoanApplicationFormProps {
@@ -186,15 +105,15 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   };
 
   const validateFile = (file: File) => {
-    const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    // REDUCED LIMIT TO 1.5MB to ensure Google Apps Script payload stays within safe execution limits
-    const maxSize = 1.5 * 1024 * 1024; 
+    const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'image/jpg'];
+    // 5MB Limit - We compress it later, so input can be larger
+    const maxSize = 5 * 1024 * 1024; 
 
     if (!validTypes.includes(file.type)) {
       return 'Invalid file type. Only JPG, PNG, and PDF are allowed.';
     }
     if (file.size > maxSize) {
-      return 'File size exceeds 1.5MB limit. Please compress your image or convert to PDF.';
+      return 'File is too large (Max 5MB).';
     }
     return null;
   };
@@ -268,27 +187,72 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
-  // Helper: Converts a File object to a Base64 string
-  const convertToBase64 = (file: File): Promise<string> => {
+  // --- IMAGE COMPRESSION HELPER ---
+  // Resizes image to max 1000px and compresses to JPEG 0.7 quality
+  const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // If it's a PDF, we can't compress with canvas, just return base64
+      if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+          const encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
+          resolve(encoded);
+        };
+        reader.onerror = reject;
+        return;
+      }
+
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        // Remove the "data:image/png;base64," prefix
-        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
-        if ((encoded.length % 4) > 0) {
-          encoded += '='.repeat(4 - (encoded.length % 4));
-        }
-        resolve(encoded);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          // Calculate new dimensions
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          
+          if (ctx) {
+             ctx.drawImage(img, 0, 0, width, height);
+             // Compress to JPEG with 0.7 quality
+             const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+             const base64 = dataUrl.split(',')[1];
+             resolve(base64);
+          } else {
+             reject(new Error("Canvas context failed"));
+          }
+        };
+        img.onerror = (err) => reject(err);
       };
-      reader.onerror = error => reject(error);
+      reader.onerror = (err) => reject(err);
     });
   };
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwrk7rTsK8sdzbTZEJf__1ao-XweOMl0dKouSgx428baE5QT-ZHRdo8WPmE55oFx8ETOQ/exec";
-
+    // IMPORTANT: REPLACE THIS URL WITH YOUR NEW DEPLOYMENT URL
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
     try {
       // 2. Prepare the data object matching the Google Script keys
       const payload = {
@@ -303,15 +267,17 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         // Loan Details
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
-        disbursementMethod: data.disbursementMethod, // Included in payload for future proofing
-        walletNumber: data.walletNumber,
+        
+        // Note: The new script strictly accepts these keys. 
+        // We aren't sending disbursementMethod/walletNumber yet as per strict script spec, 
+        // but we can append them if the script is updated.
 
-        // Images
+        // Images (Compressed)
         schoolIdImage: schoolIdBase64,
-        schoolIdMime: data.schoolIdFile ? data.schoolIdFile.type : "",
+        schoolIdMime: "image/jpeg", // We force JPEG conversion in compressImage
         
         corImage: corBase64,
-        corMime: data.corFile ? data.corFile.type : ""
+        corMime: "image/jpeg"
       };
 
       // 3. Send the POST request
@@ -320,7 +286,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         method: "POST",
         redirect: "follow", 
         headers: {
-          "Content-Type": "text/plain;charset=utf-8",
+          "Content-Type": "text/plain",
         },
         body: JSON.stringify(payload)
       });
@@ -337,9 +303,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       try {
         result = JSON.parse(text);
       } catch (e) {
-        // If parsing fails, it's likely an HTML error page from Google
-        console.error("Received non-JSON response from server:", text.substring(0, 500)); // Log first 500 chars
-        throw new Error("Server returned an invalid response. This usually happens if the file sizes are too large or the script timed out.");
+        console.error("Received non-JSON response from server:", text.substring(0, 500)); 
+        throw new Error("Server communication error. Please try again.");
       }
 
       if (result.result !== "success") {
@@ -349,7 +314,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     } catch (error) {
       console.error("Google Sheet Submission Error:", error);
-      throw error; // Re-throw to handle in UI
+      throw error; 
     }
   };
 
@@ -384,11 +349,11 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     setIsSubmitting(true);
 
     try {
-      // 1. Convert images to Base64 ONCE
+      // 1. Convert and Compress images
       let schoolIdBase64 = "";
       let corBase64 = "";
-      if (formData.schoolIdFile) schoolIdBase64 = await convertToBase64(formData.schoolIdFile);
-      if (formData.corFile) corBase64 = await convertToBase64(formData.corFile);
+      if (formData.schoolIdFile) schoolIdBase64 = await compressImage(formData.schoolIdFile);
+      if (formData.corFile) corBase64 = await compressImage(formData.corFile);
 
       // 2. Call Google Sheet sync
       await submitLoanApplication(formData, schoolIdBase64, corBase64);
@@ -398,7 +363,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     } catch (err) {
       console.error("Submission failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      alert(`Submission failed: ${errorMessage}. \n\nTip: Try reducing the size of your images if they are large.`);
+      alert(`Submission failed: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
