@@ -1,4 +1,3 @@
-
 import React, { useState, FormEvent, useRef } from 'react';
 import { db, collection, addDoc } from '../firebaseConfig';
 
@@ -207,7 +206,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsHQS23QzMXJyHq1sz1xC32cG1iPDw8bihX_lV5seY/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzL48RAuB3lbGeD3u1EcG43gqBOYGh6wDP9kuhB7pZmYrrRm_KTps2_w_GlS5sazXubTA/exec";
 
     try {
       // 1. Convert images
@@ -320,8 +319,9 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       
     } catch (err) {
       console.error("Submission warning (Database):", err);
-      // We swallow the error so the user can still proceed to success screen
+      // NOTE: If you see this error, ensure firebaseConfig.ts has valid credentials.
     } finally {
+      // We allow success even if Database fails, as long as Google Sheet/Email logic ran or we just want to show success UI.
       setIsSubmitting(false);
       setIsSubmitted(true);
     }
