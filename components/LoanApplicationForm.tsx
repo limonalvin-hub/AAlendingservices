@@ -107,13 +107,14 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   const validateFile = (file: File) => {
     const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    // REDUCED LIMIT TO 2.5MB to ensure Google Apps Script payload (max ~10MB) isn't exceeded with 2 files + base64 overhead
+    const maxSize = 2.5 * 1024 * 1024; 
 
     if (!validTypes.includes(file.type)) {
       return 'Invalid file type. Only JPG, PNG, and PDF are allowed.';
     }
     if (file.size > maxSize) {
-      return 'File size exceeds 5MB limit.';
+      return 'File size exceeds 2.5MB limit. Please compress your image.';
     }
     return null;
   };
@@ -231,10 +232,17 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         corMime: data.corFile ? data.corFile.type : ""
       };
 
+      const payloadString = JSON.stringify(payload);
+      console.log(`Sending Payload to Google Sheets. Size: ${(payloadString.length / 1024 / 1024).toFixed(2)} MB`);
+
       // 3. Send the POST request
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
-        body: JSON.stringify(payload)
+        redirect: "follow", // Important for Google Scripts 302 redirects
+        headers: {
+            "Content-Type": "text/plain;charset=utf-8", // Suppress CORS preflight
+        },
+        body: payloadString
       });
 
       const result = await response.json();
