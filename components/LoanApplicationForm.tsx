@@ -187,14 +187,14 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   const validateFile = (file: File) => {
     const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    // REDUCED LIMIT TO 2.5MB to ensure Google Apps Script payload (max ~10MB) isn't exceeded with 2 files + base64 overhead
-    const maxSize = 2.5 * 1024 * 1024; 
+    // REDUCED LIMIT TO 2MB to ensure Google Apps Script payload (max ~10MB) isn't exceeded with 2 files + base64 overhead + network timeouts
+    const maxSize = 2 * 1024 * 1024; 
 
     if (!validTypes.includes(file.type)) {
       return 'Invalid file type. Only JPG, PNG, and PDF are allowed.';
     }
     if (file.size > maxSize) {
-      return 'File size exceeds 2.5MB limit. Please compress your image.';
+      return 'File size exceeds 2MB limit. Please compress your image.';
     }
     return null;
   };
@@ -303,6 +303,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         // Loan Details
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
+        disbursementMethod: data.disbursementMethod, // Included in payload for future proofing
+        walletNumber: data.walletNumber,
 
         // Images
         schoolIdImage: schoolIdBase64,
@@ -312,23 +314,30 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         corMime: data.corFile ? data.corFile.type : ""
       };
 
-      const payloadString = JSON.stringify(payload);
-
       // 3. Send the POST request
+      // We use a simple request to avoid Preflight options if possible, or handle it via text/plain
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
-        redirect: "follow", // Important for Google Scripts 302 redirects
-        headers: {
-            "Content-Type": "text/plain;charset=utf-8", // Suppress CORS preflight
-        },
-        body: payloadString
+        body: JSON.stringify(payload)
       });
 
-      const result = await response.json();
+      if (!response.ok) {
+         throw new Error(`Server Error: ${response.status} ${response.statusText}`);
+      }
+
+      const text = await response.text();
+      
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        console.error("Received invalid JSON from server:", text);
+        throw new Error("The server response could not be understood. It might be an HTML error page from Google.");
+      }
 
       if (result.result !== "success") {
-        console.error("Google Sheet Sync Error: " + result.error);
-        throw new Error(result.error);
+        console.error("Script returned error:", result.error);
+        throw new Error(result.error || "Unknown error from script");
       }
 
     } catch (error) {
@@ -381,7 +390,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       
     } catch (err) {
       console.error("Submission failed:", err);
-      alert("Submission failed. Please check your internet connection or try again later.");
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert(`Submission failed: ${errorMessage}. Please check your internet connection and try again.`);
     } finally {
       setIsSubmitting(false);
     }
