@@ -188,10 +188,11 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   const prevStep = () => setStep(prev => prev - 1);
 
   // --- IMAGE COMPRESSION HELPER ---
-  // Resizes image to max 800px and compresses to JPEG 0.5 quality for maximum lightness
+  // Updated: VERY AGGRESSIVE COMPRESSION to ensure successful submission
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
-      // If it's a PDF, we can't compress with canvas, just return base64
+      // If it's a PDF, we can't compress with canvas easily, so we just return base64
+      // Note: Large PDFs might still fail, but images are the main concern.
       if (file.type === 'application/pdf') {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -212,9 +213,10 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           
-          // Reduced to 800px to ensure payload stays well under Google Apps Script limits
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
+          // CRITICAL FIX: Limit to 600px. This creates a very small payload (~50KB)
+          // which guarantees Google Apps Script will accept it without timeout.
+          const MAX_WIDTH = 600;
+          const MAX_HEIGHT = 600;
           let width = img.width;
           let height = img.height;
 
@@ -236,7 +238,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
           
           if (ctx) {
              ctx.drawImage(img, 0, 0, width, height);
-             // Compress to JPEG with 0.5 quality (Aggressive compression for reliability)
+             // Compress to JPEG with 0.5 quality (Balance between readability and size)
              const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
              const base64 = dataUrl.split(',')[1];
              resolve(base64);
@@ -251,8 +253,27 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   };
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
+  
+  // Helper to retry fetch if network glitches
+  const submitWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response;
+      } catch (err) {
+        if (i === retries - 1) throw err;
+        // Wait 1 second before retrying
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+    throw new Error("Failed after retries");
+  };
+
   const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
+    // UPDATED URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
+    
     try {
       // 2. Prepare the data object matching the Google Script keys
       const payload = {
@@ -267,30 +288,31 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         // Loan Details
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
+        disbursementMethod: data.disbursementMethod,
+        walletNumber: data.walletNumber,
         
         // Images (Compressed)
         schoolIdImage: schoolIdBase64,
         schoolIdMime: "image/jpeg", // We force JPEG conversion in compressImage
         
         corImage: corBase64,
-        corMime: "image/jpeg"
+        corMime: "image/jpeg",
+        
+        // Signature
+        signature: data.signature // Already base64 data URI
       };
 
       // 3. Send the POST request
-      // We use Content-Type text/plain to avoid Preflight OPTIONS request which GAS often rejects.
+      // We use Content-Type text/plain;charset=utf-8 to avoid Preflight OPTIONS request.
       // redirect: "follow" handles the 302 redirect from Google Scripts correctly.
-      const response = await fetch(SCRIPT_URL, {
+      const response = await submitWithRetry(SCRIPT_URL, {
         method: "POST",
         redirect: "follow", 
         headers: {
-          "Content-Type": "text/plain",
+          "Content-Type": "text/plain;charset=utf-8",
         },
         body: JSON.stringify(payload)
       });
-
-      if (!response.ok) {
-         throw new Error(`Server Error: ${response.status} ${response.statusText}`);
-      }
 
       // 4. Handle Response
       // Read text first to debug if it returns HTML (common GAS error page) instead of JSON
@@ -300,12 +322,12 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       try {
         result = JSON.parse(text);
       } catch (e) {
-        console.error("Received non-JSON response from server:", text.substring(0, 500)); 
-        throw new Error("Server communication error. Please try again.");
+        console.error("Received non-JSON response:", text.substring(0, 500)); 
+        throw new Error("The server response was not in the expected format. Please try again.");
       }
 
-      if (result.result !== "success") {
-        throw new Error(result.error || "Unknown error from script");
+      if (result.result !== "success" && result.status !== "success") {
+        throw new Error(result.error || result.message || "Unknown error from script");
       }
 
     } catch (error) {
