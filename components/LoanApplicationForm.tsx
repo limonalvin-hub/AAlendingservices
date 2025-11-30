@@ -20,8 +20,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     loanAmount: '',
     disbursementMethod: '',
     walletNumber: '',
-    corFile: null as File | null,
-    schoolIdFile: null as File | null,
     signature: '',
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -104,20 +102,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     return /^09\d{9}$/.test(phone);
   };
 
-  const validateFile = (file: File) => {
-    const validTypes = ['image/jpeg', 'image/png', 'application/pdf', 'image/jpg'];
-    // 5MB Limit - We compress it later, so input can be larger
-    const maxSize = 5 * 1024 * 1024; 
-
-    if (!validTypes.includes(file.type)) {
-      return 'Invalid file type. Only JPG, PNG, and PDF are allowed.';
-    }
-    if (file.size > maxSize) {
-      return 'File is too large (Max 5MB).';
-    }
-    return null;
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prevState => ({ ...prevState, [name]: value }));
@@ -139,27 +123,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
           delete newErrors[name];
           return newErrors;
         });
-      }
-    }
-  };
-  
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, files } = e.target;
-    if (files && files.length > 0) {
-      const file = files[0];
-      const error = validateFile(file);
-      
-      if (error) {
-        setErrors(prev => ({ ...prev, [name]: error }));
-        e.target.value = '';
-        setFormData(prevState => ({ ...prevState, [name]: null }));
-      } else {
-        setErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors[name];
-          return newErrors;
-        });
-        setFormData(prevState => ({ ...prevState, [name]: file }));
       }
     }
   };
@@ -187,71 +150,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
-  // --- IMAGE COMPRESSION HELPER ---
-  // Updated: VERY AGGRESSIVE COMPRESSION to ensure successful submission
-  const compressImage = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      // If it's a PDF, we can't compress with canvas easily, so we just return base64
-      // Note: Large PDFs might still fail, but images are the main concern.
-      if (file.type === 'application/pdf') {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => {
-          const encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
-          resolve(encoded);
-        };
-        reader.onerror = reject;
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        const img = new Image();
-        img.src = event.target?.result as string;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          // CRITICAL FIX: Limit to 600px. This creates a very small payload (~50KB)
-          // which guarantees Google Apps Script will accept it without timeout.
-          const MAX_WIDTH = 600;
-          const MAX_HEIGHT = 600;
-          let width = img.width;
-          let height = img.height;
-
-          // Calculate new dimensions
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          
-          if (ctx) {
-             ctx.drawImage(img, 0, 0, width, height);
-             // Compress to JPEG with 0.5 quality (Balance between readability and size)
-             const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-             const base64 = dataUrl.split(',')[1];
-             resolve(base64);
-          } else {
-             reject(new Error("Canvas context failed"));
-          }
-        };
-        img.onerror = (err) => reject(err);
-      };
-      reader.onerror = (err) => reject(err);
-    });
-  };
-
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   
   // Helper to retry fetch if network glitches
@@ -270,7 +168,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     throw new Error("Failed after retries");
   };
 
-  const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
+  const submitLoanApplication = async (data: typeof formData) => {
     // UPDATED URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
     
@@ -291,12 +189,11 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         disbursementMethod: data.disbursementMethod,
         walletNumber: data.walletNumber,
         
-        // Images (Compressed)
-        schoolIdImage: schoolIdBase64,
-        schoolIdMime: "image/jpeg", // We force JPEG conversion in compressImage
-        
-        corImage: corBase64,
-        corMime: "image/jpeg",
+        // Images (REMOVED - Sending empty strings to prevent errors in backend)
+        schoolIdImage: "",
+        schoolIdMime: "", 
+        corImage: "",
+        corMime: "",
         
         // Signature
         signature: data.signature // Already base64 data URI
@@ -354,8 +251,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       }
     }
 
-    if (!formData.corFile) stepErrors.corFile = 'Certificate of Registration is required';
-    if (!formData.schoolIdFile) stepErrors.schoolIdFile = 'School ID is required';
     if (!formData.signature) stepErrors.signature = 'Please sign the application';
     if (!agreedToTerms) stepErrors.terms = 'You must agree to the terms and conditions.';
 
@@ -367,14 +262,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     setIsSubmitting(true);
 
     try {
-      // 1. Convert and Compress images
-      let schoolIdBase64 = "";
-      let corBase64 = "";
-      if (formData.schoolIdFile) schoolIdBase64 = await compressImage(formData.schoolIdFile);
-      if (formData.corFile) corBase64 = await compressImage(formData.corFile);
-
-      // 2. Call Google Sheet sync
-      await submitLoanApplication(formData, schoolIdBase64, corBase64);
+      // 2. Call Google Sheet sync (Text Only)
+      await submitLoanApplication(formData);
       
       setIsSubmitted(true);
       
@@ -402,8 +291,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       loanAmount: '',
       disbursementMethod: '',
       walletNumber: '',
-      corFile: null as File | null,
-      schoolIdFile: null as File | null,
       signature: '',
     });
   }
@@ -420,11 +307,13 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Submitted!</h3>
-              <p className="text-gray-600 mb-6">Your application has been successfully received. Our team will review your details and process your request within 24 hours.</p>
+              <p className="text-gray-600 mb-6">Your application details have been received.</p>
               
-              <div className="bg-blue-50 border-l-4 border-brand-blue text-blue-800 p-4 rounded-md mb-8 text-left" role="alert">
-                  <p className="font-bold mb-1">What happens next?</p>
-                  <p>Please keep your lines open. We may contact you via SMS or Email for verification purposes.</p>
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-6 rounded-md mb-8 text-left" role="alert">
+                  <p className="font-bold mb-2 text-lg">⚠️ IMPORTANT FINAL STEP:</p>
+                  <p className="mb-2">To complete your application, please email your <strong>School ID</strong> and <strong>Certificate of Registration (COR)</strong> to:</p>
+                  <a href="mailto:aalendingservices@gmail.com" className="font-bold text-brand-blue text-lg underline">aalendingservices@gmail.com</a>
+                  <p className="mt-2 text-sm">Please include your <strong>Full Name</strong> in the subject line.</p>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8 border-t pt-6">
@@ -568,19 +457,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
                             {errors.walletNumber && <p className="text-red-500 text-xs mt-1">{errors.walletNumber}</p>}
                           </div>
                         )}
-                      </div>
-
-                      <div>
-                        <label htmlFor="corFile" className="block text-sm font-medium text-gray-700">Upload Certificate of Registration (COR)</label>
-                        <input type="file" accept=".jpg,.jpeg,.png,.pdf" name="corFile" id="corFile" onChange={handleFileChange} required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-brand-green hover:file:bg-green-100"/>
-                        {formData.corFile && <span className="text-xs text-gray-500 mt-1">Selected: {formData.corFile.name}</span>}
-                        {errors.corFile && <p className="text-red-500 text-xs mt-1">{errors.corFile}</p>}
-                      </div>
-                      <div>
-                        <label htmlFor="schoolIdFile" className="block text-sm font-medium text-gray-700">Upload School ID (Front & Back)</label>
-                        <input type="file" accept=".jpg,.jpeg,.png,.pdf" name="schoolIdFile" id="schoolIdFile" onChange={handleFileChange} required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-brand-green hover:file:bg-green-100"/>
-                        {formData.schoolIdFile && <span className="text-xs text-gray-500 mt-1">Selected: {formData.schoolIdFile.name}</span>}
-                        {errors.schoolIdFile && <p className="text-red-500 text-xs mt-1">{errors.schoolIdFile}</p>}
                       </div>
 
                       {/* Client Signature Section */}
