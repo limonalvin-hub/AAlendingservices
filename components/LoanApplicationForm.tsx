@@ -187,14 +187,14 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   const validateFile = (file: File) => {
     const validTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    // REDUCED LIMIT TO 2MB to ensure Google Apps Script payload (max ~10MB) isn't exceeded with 2 files + base64 overhead + network timeouts
-    const maxSize = 2 * 1024 * 1024; 
+    // REDUCED LIMIT TO 1.5MB to ensure Google Apps Script payload stays within safe execution limits
+    const maxSize = 1.5 * 1024 * 1024; 
 
     if (!validTypes.includes(file.type)) {
       return 'Invalid file type. Only JPG, PNG, and PDF are allowed.';
     }
     if (file.size > maxSize) {
-      return 'File size exceeds 2MB limit. Please compress your image.';
+      return 'File size exceeds 1.5MB limit. Please compress your image or convert to PDF.';
     }
     return null;
   };
@@ -315,9 +315,13 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       };
 
       // 3. Send the POST request
-      // We use a simple request to avoid Preflight options if possible, or handle it via text/plain
+      // We use Content-Type text/plain to avoid Preflight OPTIONS request which GAS often rejects.
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
+        redirect: "follow", 
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8",
+        },
         body: JSON.stringify(payload)
       });
 
@@ -325,14 +329,17 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
          throw new Error(`Server Error: ${response.status} ${response.statusText}`);
       }
 
+      // 4. Handle Response
+      // Read text first to debug if it returns HTML (common GAS error page) instead of JSON
       const text = await response.text();
       
       let result;
       try {
         result = JSON.parse(text);
       } catch (e) {
-        console.error("Received invalid JSON from server:", text);
-        throw new Error("The server response could not be understood. It might be an HTML error page from Google.");
+        // If parsing fails, it's likely an HTML error page from Google
+        console.error("Received non-JSON response from server:", text.substring(0, 500)); // Log first 500 chars
+        throw new Error("Server returned an invalid response. This usually happens if the file sizes are too large or the script timed out.");
       }
 
       if (result.result !== "success") {
@@ -391,7 +398,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     } catch (err) {
       console.error("Submission failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      alert(`Submission failed: ${errorMessage}. Please check your internet connection and try again.`);
+      alert(`Submission failed: ${errorMessage}. \n\nTip: Try reducing the size of your images if they are large.`);
     } finally {
       setIsSubmitting(false);
     }
