@@ -188,7 +188,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   const prevStep = () => setStep(prev => prev - 1);
 
   // --- IMAGE COMPRESSION HELPER ---
-  // Resizes image to max 1000px and compresses to JPEG 0.7 quality
+  // Resizes image to max 800px and compresses to JPEG 0.5 quality for maximum lightness
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       // If it's a PDF, we can't compress with canvas, just return base64
@@ -212,8 +212,9 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           
-          const MAX_WIDTH = 1000;
-          const MAX_HEIGHT = 1000;
+          // Reduced to 800px to ensure payload stays well under Google Apps Script limits
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 800;
           let width = img.width;
           let height = img.height;
 
@@ -235,8 +236,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
           
           if (ctx) {
              ctx.drawImage(img, 0, 0, width, height);
-             // Compress to JPEG with 0.7 quality
-             const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+             // Compress to JPEG with 0.5 quality (Aggressive compression for reliability)
+             const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
              const base64 = dataUrl.split(',')[1];
              resolve(base64);
           } else {
@@ -251,7 +252,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
-    // IMPORTANT: REPLACE THIS URL WITH YOUR NEW DEPLOYMENT URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
     try {
       // 2. Prepare the data object matching the Google Script keys
@@ -268,10 +268,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
         
-        // Note: The new script strictly accepts these keys. 
-        // We aren't sending disbursementMethod/walletNumber yet as per strict script spec, 
-        // but we can append them if the script is updated.
-
         // Images (Compressed)
         schoolIdImage: schoolIdBase64,
         schoolIdMime: "image/jpeg", // We force JPEG conversion in compressImage
@@ -282,6 +278,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       // 3. Send the POST request
       // We use Content-Type text/plain to avoid Preflight OPTIONS request which GAS often rejects.
+      // redirect: "follow" handles the 302 redirect from Google Scripts correctly.
       const response = await fetch(SCRIPT_URL, {
         method: "POST",
         redirect: "follow", 
@@ -308,12 +305,11 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       }
 
       if (result.result !== "success") {
-        console.error("Script returned error:", result.error);
         throw new Error(result.error || "Unknown error from script");
       }
 
     } catch (error) {
-      console.error("Google Sheet Submission Error:", error);
+      console.error("Submission Error:", error);
       throw error; 
     }
   };
@@ -361,9 +357,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       setIsSubmitted(true);
       
     } catch (err) {
-      console.error("Submission failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      alert(`Submission failed: ${errorMessage}`);
+      alert(`Submission failed: ${errorMessage}. Please check your internet connection.`);
     } finally {
       setIsSubmitting(false);
     }
