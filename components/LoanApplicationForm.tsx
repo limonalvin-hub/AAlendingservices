@@ -206,7 +206,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsHQS23QzMXJyHq1sz1xC32cG1iPDw8bihX_lV5seY/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyHbwUsOjYym-w5A5NY1GrXsLjK_2QDyXHucV3zLb6pnND_BVNcWtQhPwI_6F5iNv0pqQ/exec";
 
     try {
       // 2. Prepare the data object matching the Google Script keys
