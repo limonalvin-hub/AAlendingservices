@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 
 interface MaintenancePageProps {
@@ -12,7 +13,6 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
     
     // 2. If Maintenance is OFF, Initiate Recovery
     if (!maintenanceActive) {
-        console.log("System Status: ONLINE. Executing Recovery...");
         
         // 3. CACHE BUSTING REDIRECT
         // We add a timestamp query param to force the browser to treat this as a fresh request.
@@ -31,9 +31,7 @@ const MaintenancePage: React.FC<MaintenancePageProps> = ({ onRefresh }) => {
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then((registrations) => {
             for (const registration of registrations) {
-                registration.unregister().then(() => {
-                    console.log("SW Unregistered to prevent stale cache.");
-                });
+                registration.unregister();
             }
         });
     }

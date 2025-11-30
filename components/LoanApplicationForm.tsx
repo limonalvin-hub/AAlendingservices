@@ -1,3 +1,4 @@
+
 import React, { useState, FormEvent, useRef } from 'react';
 import { db, collection, addDoc } from '../firebaseConfig';
 
@@ -233,7 +234,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       };
 
       const payloadString = JSON.stringify(payload);
-      console.log(`Sending Payload to Google Sheets. Size: ${(payloadString.length / 1024 / 1024).toFixed(2)} MB`);
 
       // 3. Send the POST request
       const response = await fetch(SCRIPT_URL, {
@@ -247,9 +247,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       const result = await response.json();
 
-      if (result.result === "success") {
-        console.log("Application synced to Google Sheets successfully.");
-      } else {
+      if (result.result !== "success") {
         console.error("Google Sheet Sync Error: " + result.error);
       }
 
@@ -329,7 +327,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
 
       await Promise.race([saveToDb, timeout]);
-      console.log("Application saved to Firestore");
       
     } catch (err) {
       console.error("Submission warning (Database/Image Processing):", err);

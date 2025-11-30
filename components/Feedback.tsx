@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 
 const testimonials = [
@@ -40,7 +41,6 @@ const Feedback: React.FC = () => {
   const handleFeedbackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (feedbackText.trim() === '') return;
-    console.log("Feedback submitted:", feedbackText);
     setIsFeedbackSubmitted(true);
     setFeedbackText('');
     setTimeout(() => setIsFeedbackSubmitted(false), 4000); // Hide success message after 4 seconds

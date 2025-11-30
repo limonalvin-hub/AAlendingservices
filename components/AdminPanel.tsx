@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { db, collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from '../firebaseConfig';
 import emailjs from '@emailjs/browser';
@@ -113,8 +114,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
          status: newStatus
        });
        
-       console.log(`Updated ${id} to ${newStatus}`);
-
        // --- SEND AUTOMATED EMAIL NOTIFICATION ---
        if (applicantEmail && applicantName && (newStatus === 'Approved' || newStatus === 'Rejected')) {
           let messageBody = "";

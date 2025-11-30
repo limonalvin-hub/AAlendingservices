@@ -30,45 +30,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ onBack }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // --- AUTOMATIC ADMIN REFLECTION LOGIC ---
-    // 1. Get existing applications
-    try {
-      const storedApps = localStorage.getItem('loanApplications');
-      if (storedApps) {
-        let apps = JSON.parse(storedApps);
-        let matchFound = false;
-
-        // 2. Find matching application (Name & Phone) that is Approved or Pending
-        // We update it to 'Paid' automatically so the Admin sees it instantly.
-        apps = apps.map((app: any) => {
-          if (
-            app.name.toLowerCase().trim() === formData.name.toLowerCase().trim() &&
-            app.phone.trim() === formData.phone.trim() &&
-            (app.status === 'Approved' || app.status === 'Pending')
-          ) {
-            matchFound = true;
-            return { ...app, status: 'Paid' };
-          }
-          return app;
-        });
-
-        // 3. Save back to storage if a match was updated
-        if (matchFound) {
-          localStorage.setItem('loanApplications', JSON.stringify(apps));
-          
-          // --- REAL-TIME BROADCAST ---
-          // Notify Admin Panel instantly using BroadcastChannel API
-          const syncChannel = new BroadcastChannel('app_sync_channel');
-          syncChannel.postMessage({ type: 'PAYMENT_RECEIVED' });
-          syncChannel.close();
-
-          console.log("Payment automatically matched, record updated, and admin notified.");
-        }
-      }
-    } catch (err) {
-      console.error("Error updating payment status:", err);
-    }
 
     // Simulate redirection for E-wallets
     if (formData.method === 'gcash') {
