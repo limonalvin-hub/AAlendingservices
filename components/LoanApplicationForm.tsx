@@ -152,8 +152,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // 1. Submit to Google Sheets (Backend Record)
   const submitLoanApplication = async (data: typeof formData) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkxRf4F_jqe8hrejQn-qAhn8IjGqow_aDq88d_ZGyXa_PO2EetZKW1_AhDVviswkruww/exec";
-    
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcRiaGU-R8DbbSr5__9A78tYS6eKuz6OHFdT6lYEgdXJvBEmCbDzmozBIVT7WPj5lFVg/exec"
     try {
       const payload = {
         fullName: data.name,
