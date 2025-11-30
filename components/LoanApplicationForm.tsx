@@ -152,7 +152,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   const submitLoanApplication = async (data: typeof formData) => {
     // 1. URL Check: Ensure this matches your latest deployed web app URL
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkxRf4F_jqe8hrejQn-qAhn8IjGqow_aDq88d_ZGyXa_PO2EetZKW1_AhDVviswkruww/exec";
     
     try {
       const payload = {
