@@ -1,5 +1,162 @@
 import React, { useState, FormEvent, useRef } from 'react';
 
+/* 
+  ===================================================================
+  GOOGLE APPS SCRIPT BACKEND CODE (COPY & PASTE TO GOOGLE SCRIPT)
+  ===================================================================
+
+  // A&A Lending Services Backend
+  // Handles Form Submission, Admin Notifications, and Automated Student Emails.
+
+  const ADMIN_EMAIL = "aalendingservices@gmail.com";
+
+  // 1. READ DATA (For Admin Dashboard - Optional)
+  function doGet(e) {
+    return handleCORS(function() {
+      var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0];
+      var jsonData = [];
+      
+      for (var i = 1; i < data.length; i++) {
+        var row = {};
+        for (var j = 0; j < headers.length; j++) {
+          row[headers[j]] = data[i][j];
+        }
+        jsonData.push(row);
+      }
+      return JSON.stringify({ status: "success", data: jsonData });
+    });
+  }
+
+  // 2. WRITE DATA (Receive Application)
+  function doPost(e) {
+    return handleCORS(function() {
+      var lock = LockService.getScriptLock();
+      // Wait for up to 10 seconds for other processes to finish.
+      lock.tryLock(10000); 
+
+      try {
+        var data = JSON.parse(e.postData.contents);
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var sheet = ss.getActiveSheet();
+
+        // Setup Headers if sheet is empty
+        if (sheet.getLastRow() === 0) {
+          var headers = [
+            "Timestamp", 
+            "Full Name", 
+            "School ID", 
+            "Course", 
+            "Address", 
+            "Phone Number", 
+            "Email Address", 
+            "Loan Amount", 
+            "Purpose", 
+            "Disbursement Method", 
+            "Wallet Number", 
+            "Status" // Column 12
+          ];
+          sheet.appendRow(headers);
+          sheet.setFrozenRows(1);
+        }
+
+        var timestamp = new Date();
+        
+        // Prepare Row Data
+        var newRow = [
+          timestamp,
+          data.fullName,
+          data.schoolIdNumber,
+          data.collegeCourse,
+          data.address,
+          data.phoneNumber,
+          data.emailAddress,
+          "'" + data.loanAmount, // Force string to prevent formatting issues
+          data.purposeOfLoan,
+          data.disbursementMethod,
+          "'" + data.walletNumber,
+          "Pending" // Default Status
+        ];
+
+        sheet.appendRow(newRow);
+
+        // --- SMART SHEET FEATURE: ADD DROPDOWN ---
+        var lastRow = sheet.getLastRow();
+        // Status is Column 12 based on the header list above
+        var statusCell = sheet.getRange(lastRow, 12); 
+        var rule = SpreadsheetApp.newDataValidation()
+          .requireValueInList(['Pending', 'Approved', 'Rejected'], true)
+          .setAllowInvalid(false)
+          .build();
+        statusCell.setDataValidation(rule);
+
+        // --- NOTIFICATION: EMAIL ADMIN ---
+        var subject = "New Loan Application: " + data.fullName;
+        var body = 
+          "A new application has been received.\n\n" +
+          "Name: " + data.fullName + "\n" +
+          "Amount: " + data.loanAmount + "\n" +
+          "Phone: " + data.phoneNumber + "\n\n" +
+          "Please check the Google Sheet to review.";
+        
+        MailApp.sendEmail(ADMIN_EMAIL, subject, body);
+
+        return JSON.stringify({ result: "success" });
+
+      } catch (error) {
+        return JSON.stringify({ result: "error", error: error.toString() });
+      } finally {
+        lock.releaseLock();
+      }
+    });
+  }
+
+  // 3. AUTOMATION: Email Student on Status Change
+  function onEdit(e) {
+    var range = e.range;
+    var sheet = range.getSheet();
+    var row = range.getRow();
+    var col = range.getColumn();
+    
+    // Basic checks: Not header row, must be "Status" column (Col 12)
+    if (row > 1 && col === 12) { 
+      var newStatus = e.value;
+      // Email is in Column 7
+      var emailCell = sheet.getRange(row, 7); 
+      var studentEmail = emailCell.getValue();
+      
+      // Name is in Column 2
+      var nameCell = sheet.getRange(row, 2);
+      var studentName = nameCell.getValue();
+
+      if (newStatus === "Approved") {
+        MailApp.sendEmail({
+          to: studentEmail,
+          subject: "Loan Approved - Allowance Aid",
+          body: "Dear " + studentName + ",\n\nGreat news! Your loan application has been APPROVED.\n\nWe will process the disbursement shortly to your chosen method.\n\nThank you,\nAllowance Aid Lending Services"
+        });
+      } else if (newStatus === "Rejected") {
+        MailApp.sendEmail({
+          to: studentEmail,
+          subject: "Loan Application Update - Allowance Aid",
+          body: "Dear " + studentName + ",\n\nWe have reviewed your application. Unfortunately, we cannot approve your loan at this time.\n\nThank you,\nAllowance Aid Lending Services"
+        });
+      }
+    }
+  }
+
+  // --- HELPER: CORS Handler ---
+  function handleCORS(callback) {
+    var result = callback();
+    return ContentService.createTextOutput(result).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  ===================================================================
+  END OF BACKEND CODE
+  ===================================================================
+*/
+
 interface LoanApplicationFormProps {
   onBack: () => void;
 }
@@ -152,7 +309,9 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // 1. Submit to Google Sheets (Backend Record)
   const submitLoanApplication = async (data: typeof formData) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcRiaGU-R8DbbSr5__9A78tYS6eKuz6OHFdT6lYEgdXJvBEmCbDzmozBIVT7WPj5lFVg/exec"
+    // UPDATED SCRIPT URL
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNnHIioqUO9PQnHM-oi5FdYXyDbiMq19-o_i_7hD9zby4dWQOlv6FE6-F_BiroBsaqCA/exec";
+    
     try {
       const payload = {
         fullName: data.name,
@@ -164,13 +323,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
         disbursementMethod: data.disbursementMethod,
-        walletNumber: data.walletNumber,
-        schoolIdImage: "",
-        schoolIdMime: "", 
-        corImage: "",
-        corMime: "",
-        signature: data.signature,
-        submissionTimestamp: new Date().toISOString()
+        walletNumber: data.walletNumber
       };
 
       await fetch(SCRIPT_URL, {
