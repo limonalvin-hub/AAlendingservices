@@ -188,14 +188,36 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
+  // Helper: Converts a File object to a Base64 string
+  const convertToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        // Remove the "data:image/png;base64," prefix
+        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
+        if ((encoded.length % 4) > 0) {
+          encoded += '='.repeat(4 - (encoded.length % 4));
+        }
+        resolve(encoded);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
   const submitLoanApplication = async (data: typeof formData) => {
-    // 1. The URL generated after deploying the Google App Script
-    // Using '/exec' instead of '/dev' ensures the deployed script is accessible.
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzL48RAuB3lbGeD3u1EcG43gqBOYGh6wDP9kuhB7pZmYrrRm_KTps2_w_GlS5sazXubTA/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVE8IrcRUrSE3P-0YhUoMa1GKQ00OQB8dQsRy38qRB9TfXc69N6UElLr-BjZ2lySTB2w/exec";
 
     try {
-      // Determine terms based on amount logic
+      // 1. Convert images
+      let schoolIdBase64 = "";
+      let corBase64 = "";
+
+      if (data.schoolIdFile) schoolIdBase64 = await convertToBase64(data.schoolIdFile);
+      if (data.corFile) corBase64 = await convertToBase64(data.corFile);
+
+      // Determine terms based on amount logic (optional but helpful context)
       let terms = "1 Week";
       const amt = parseFloat(data.loanAmount);
       if (amt >= 300 && amt <= 500) terms = "2 Weeks";
@@ -203,12 +225,25 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       // 2. Prepare the data object matching the Google Script keys
       const payload = {
-        fullName: data.name,         
-        contactNumber: data.phone, 
-        emailAddress: data.email,          
-        loanAmount: data.loanAmount,           
-        purposeOfLoan: data.loanPurpose,       
-        paymentTerms: terms           
+        // Personal Details
+        fullName: data.name,
+        schoolIdNumber: data.schoolId,
+        collegeCourse: data.course,
+        address: data.address,
+        phoneNumber: data.phone,
+        emailAddress: data.email,
+        
+        // Loan Details
+        loanAmount: data.loanAmount,
+        purposeOfLoan: data.loanPurpose,
+        paymentTerms: terms, // Included for context
+
+        // Images
+        schoolIdImage: schoolIdBase64,
+        schoolIdMime: data.schoolIdFile ? data.schoolIdFile.type : "",
+        
+        corImage: corBase64,
+        corMime: data.corFile ? data.corFile.type : ""
       };
 
       // 3. Send the POST request
@@ -221,7 +256,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
       if (result.result === "success") {
         console.log("Application synced to Google Sheets successfully.");
-        // We use the app's existing UI for success messages instead of alerts.
       } else {
         console.error("Google Sheet Sync Error: " + result.error);
       }
