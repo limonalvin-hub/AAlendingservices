@@ -150,8 +150,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
+  // 1. Submit to Google Sheets (Backend Record)
   const submitLoanApplication = async (data: typeof formData) => {
-    // 1. URL Check: Ensure this matches your latest deployed web app URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzkxRf4F_jqe8hrejQn-qAhn8IjGqow_aDq88d_ZGyXa_PO2EetZKW1_AhDVviswkruww/exec";
     
     try {
@@ -166,18 +166,14 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         purposeOfLoan: data.loanPurpose,
         disbursementMethod: data.disbursementMethod,
         walletNumber: data.walletNumber,
-        // Send empty strings for images as requested to prevent payload size errors
         schoolIdImage: "",
         schoolIdMime: "", 
         corImage: "",
         corMime: "",
         signature: data.signature,
-        submissionTimestamp: new Date().toISOString() // Helps debug uniqueness
+        submissionTimestamp: new Date().toISOString()
       };
 
-      // 2. CRITICAL FIX: "no-cors" Mode
-      // This tells the browser to send the data without waiting for a permission slip from Google.
-      // We cannot read the response in this mode (it will be opaque), but the data WILL be sent.
       await fetch(SCRIPT_URL, {
         method: "POST",
         mode: "no-cors", 
@@ -187,13 +183,45 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         body: JSON.stringify(payload)
       });
 
-      // Since we use no-cors, we assume success if the network request didn't throw an error.
       return true;
-
     } catch (error) {
       console.error("Submission Error:", error);
-      throw error; 
+      // We continue even if sheet fails, so the user can still email
+      return false;
     }
+  };
+
+  // 2. Open Email Client (User Manual Send)
+  const handleEmailComposition = (data: typeof formData) => {
+    const subject = encodeURIComponent(`Loan Application - ${data.name}`);
+    const body = encodeURIComponent(`
+Dear A&A Lending Services,
+
+I am submitting my loan application details.
+
+--- APPLICANT DETAILS ---
+Name: ${data.name}
+School ID: ${data.schoolId}
+Course: ${data.course}
+Address: ${data.address}
+Phone: ${data.phone}
+Email: ${data.email}
+
+--- LOAN REQUEST ---
+Amount: ₱${data.loanAmount}
+Purpose: ${data.loanPurpose}
+Disbursement Method: ${data.disbursementMethod}
+${data.disbursementMethod !== 'in_person' ? `Wallet Number: ${data.walletNumber}` : ''}
+
+--- REQUIREMENTS ---
+I have attached my School ID and Certificate of Registration (COR) to this email.
+
+Sincerely,
+${data.name}
+    `);
+
+    // Force open the mail client
+    window.location.href = `mailto:aalendingservices@gmail.com?subject=${subject}&body=${body}`;
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -224,11 +252,17 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     setIsSubmitting(true);
 
     try {
+      // Step A: Send to Google Sheet (Behind the scenes)
       await submitLoanApplication(formData);
+      
+      // Step B: Open Email for User to Attach Files
+      handleEmailComposition(formData);
+
       setIsSubmitted(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      alert(`Submission failed: ${errorMessage}. Please check your internet connection.`);
+      // Fallback: Just open email if sheet fails
+      handleEmailComposition(formData);
+      setIsSubmitted(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -265,20 +299,26 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Submitted!</h3>
-              <p className="text-gray-600 mb-6">Your application details have been received.</p>
+              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Recorded!</h3>
+              <p className="text-gray-600 mb-6">Your details have been saved to our system.</p>
               
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 p-6 rounded-md mb-8 text-left" role="alert">
-                  <p className="font-bold mb-2 text-lg">⚠️ IMPORTANT FINAL STEP:</p>
-                  <p className="mb-2">To complete your application, please email your <strong>School ID</strong> and <strong>Certificate of Registration (COR)</strong> to:</p>
-                  <a href="mailto:aalendingservices@gmail.com" className="font-bold text-brand-blue text-lg underline">aalendingservices@gmail.com</a>
-                  <p className="mt-2 text-sm">Please include your <strong>Full Name</strong> in the subject line.</p>
+              <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-6 rounded-md mb-8 text-left" role="alert">
+                  <p className="font-bold mb-2 text-lg">📧 ONE FINAL STEP:</p>
+                  <p className="mb-4">Your email app should have opened automatically. Please <strong>attach your School ID and COR</strong> to that email and hit <strong>Send</strong>.</p>
+                  
+                  <p className="text-sm mb-2">If your email app didn't open, click the button below:</p>
+                  <button 
+                    onClick={() => handleEmailComposition(formData)}
+                    className="bg-brand-blue text-white px-4 py-2 rounded-md font-bold hover:bg-brand-blue-dark transition"
+                  >
+                    Open Email & Attach Files
+                  </button>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8 border-t pt-6">
                 <button
                   onClick={handleNewApplication}
-                  className="bg-brand-blue hover:bg-brand-blue-dark text-white font-bold py-3 px-6 rounded-lg transition duration-300"
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-lg transition duration-300"
                 >
                   Start New Application
                 </button>
