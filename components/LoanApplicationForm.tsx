@@ -205,17 +205,10 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   };
 
   // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
-  const submitLoanApplication = async (data: typeof formData) => {
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzL48RAuB3lbGeD3u1EcG43gqBOYGh6wDP9kuhB7pZmYrrRm_KTps2_w_GlS5sazXubTA/exec";
+  const submitLoanApplication = async (data: typeof formData, schoolIdBase64: string, corBase64: string) => {
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwsHQS23QzMXJyHq1sz1xC32cG1iPDw8bihX_lV5seY/exec";
 
     try {
-      // 1. Convert images
-      let schoolIdBase64 = "";
-      let corBase64 = "";
-
-      if (data.schoolIdFile) schoolIdBase64 = await convertToBase64(data.schoolIdFile);
-      if (data.corFile) corBase64 = await convertToBase64(data.corFile);
-
       // 2. Prepare the data object matching the Google Script keys
       const payload = {
         // Personal Details
@@ -287,11 +280,19 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
     setIsSubmitting(true);
 
-    // Call Google Sheet sync concurrently
-    submitLoanApplication(formData).catch(err => console.error("Background sync failed", err));
-
     try {
-      // --- 1. SAVE TO FIRESTORE (Admin Panel Sync) ---
+      // 1. Convert images to Base64 ONCE
+      let schoolIdBase64 = "";
+      let corBase64 = "";
+      if (formData.schoolIdFile) schoolIdBase64 = await convertToBase64(formData.schoolIdFile);
+      if (formData.corFile) corBase64 = await convertToBase64(formData.corFile);
+
+      // 2. Call Google Sheet sync concurrently using the prepared Base64
+      submitLoanApplication(formData, schoolIdBase64, corBase64).catch(err => console.error("Background sync failed", err));
+
+      // 3. SAVE TO FIRESTORE (Admin Panel Sync)
+      // Note: Storing full base64 images in Firestore has a 1MB limit. 
+      // If images are large, this might fail. Ideally use Firebase Storage, but this is a quick fix.
       const applicationData = {
         date: new Date().toISOString(),
         status: 'Pending',
@@ -307,21 +308,25 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
         walletNumber: formData.walletNumber,
         corFileName: formData.corFile ? formData.corFile.name : 'Not attached',
         schoolIdFileName: formData.schoolIdFile ? formData.schoolIdFile.name : 'Not attached',
+        // Saving the actual image data so Admin Panel can view it
+        corImage: corBase64,
+        corMime: formData.corFile ? formData.corFile.type : '',
+        schoolIdImage: schoolIdBase64,
+        schoolIdMime: formData.schoolIdFile ? formData.schoolIdFile.type : '',
         signature: formData.signature 
       };
 
       // 5-second timeout race condition to prevent hanging
       const saveToDb = addDoc(collection(db, "applications"), applicationData);
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000));
 
       await Promise.race([saveToDb, timeout]);
       console.log("Application saved to Firestore");
       
     } catch (err) {
-      console.error("Submission warning (Database):", err);
-      // NOTE: If you see this error, ensure firebaseConfig.ts has valid credentials.
+      console.error("Submission warning (Database/Image Processing):", err);
+      // NOTE: If you see this error, ensure firebaseConfig.ts has valid credentials and images aren't too large.
     } finally {
-      // We allow success even if Database fails, as long as Google Sheet/Email logic ran or we just want to show success UI.
       setIsSubmitting(false);
       setIsSubmitted(true);
     }

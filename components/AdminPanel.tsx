@@ -22,6 +22,10 @@ interface LoanApplication {
   walletNumber: string;
   corFileName: string;
   schoolIdFileName: string;
+  corImage?: string; // Base64
+  corMime?: string;
+  schoolIdImage?: string; // Base64
+  schoolIdMime?: string;
   signature?: string; 
 }
 
@@ -169,6 +173,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
         return <span className={`${baseClasses} bg-blue-100 text-blue-800 border border-blue-200`}><span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>Paid</span>;
       default: 
         return <span className={`${baseClasses} bg-yellow-100 text-yellow-800 border border-yellow-200`}><span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>Pending</span>;
+    }
+  };
+
+  // Helper to view file
+  const openFile = (base64: string | undefined, mime: string | undefined) => {
+    if (!base64) {
+      alert("No file data found.");
+      return;
+    }
+    const win = window.open();
+    if (win) {
+      // Decode base64 to allow proper viewing of PDF/Images
+      const prefix = `data:${mime || 'application/octet-stream'};base64,`;
+      win.document.write(
+        `<iframe src="${prefix}${base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+      );
     }
   };
 
@@ -388,6 +408,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
                                                     <span className="text-gray-300">•</span>
                                                     <span>{new Date(app.date).toLocaleDateString()}</span>
                                                 </div>
+                                                <div className="text-xs text-gray-500 font-semibold mt-1 flex items-center gap-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                                                    </svg>
+                                                    {app.phone}
+                                                </div>
                                                 <div className="text-xs text-gray-400 mt-0.5">{app.email}</div>
                                             </div>
                                         </div>
@@ -408,14 +434,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onBack }) => {
 
                                     {/* Documents Column */}
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                                                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                                <span className="truncate max-w-[120px]" title={app.corFileName}>COR: {app.corFileName}</span>
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 p-1.5 rounded border border-gray-100">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-semibold text-gray-500">COR:</span>
+                                                    <span className="truncate max-w-[60px]" title={app.corFileName}>{app.corFileName}</span>
+                                                </div>
+                                                {app.corImage ? (
+                                                  <button 
+                                                    onClick={() => openFile(app.corImage, app.corMime)}
+                                                    className="text-xs bg-brand-blue text-white px-2 py-0.5 rounded hover:bg-brand-blue-dark transition"
+                                                  >
+                                                    View
+                                                  </button>
+                                                ) : <span className="text-gray-400 italic">No File</span>}
                                             </div>
-                                            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                                                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0c0 .667.333 1 1 1v1m0-1h2" /></svg>
-                                                <span className="truncate max-w-[120px]" title={app.schoolIdFileName}>ID: {app.schoolIdFileName}</span>
+                                            
+                                            <div className="flex items-center justify-between text-xs text-gray-600 bg-gray-50 p-1.5 rounded border border-gray-100">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-semibold text-gray-500">ID:</span>
+                                                    <span className="truncate max-w-[60px]" title={app.schoolIdFileName}>{app.schoolIdFileName}</span>
+                                                </div>
+                                                {app.schoolIdImage ? (
+                                                  <button 
+                                                    onClick={() => openFile(app.schoolIdImage, app.schoolIdMime)}
+                                                    className="text-xs bg-brand-blue text-white px-2 py-0.5 rounded hover:bg-brand-blue-dark transition"
+                                                  >
+                                                    View
+                                                  </button>
+                                                ) : <span className="text-gray-400 italic">No File</span>}
                                             </div>
                                         </div>
                                     </td>
