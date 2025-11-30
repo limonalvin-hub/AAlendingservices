@@ -56,10 +56,10 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     const { x, y } = getCanvasCoordinates(e, canvas);
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineWidth = 3; // Thicker line for better visibility
-    ctx.lineCap = 'round'; // Smooth ends
-    ctx.lineJoin = 'round'; // Smooth corners
-    ctx.strokeStyle = '#1a648a'; // Brand blue color
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1a648a';
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -150,77 +150,45 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
-  // --- GOOGLE APP SCRIPT SUBMISSION LOGIC ---
-  
-  // Helper to retry fetch if network glitches
-  const submitWithRetry = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const response = await fetch(url, options);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return response;
-      } catch (err) {
-        if (i === retries - 1) throw err;
-        // Wait 1 second before retrying
-        await new Promise(r => setTimeout(r, 1000));
-      }
-    }
-    throw new Error("Failed after retries");
-  };
-
   const submitLoanApplication = async (data: typeof formData) => {
-    // UPDATED URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz9e9Ri1qIrLB4O_AGnkPidok7iXQUc1WqeewNMurr1xAkwu1rzfLbhoRuXU24nVov04w/exec";
     
     try {
-      // 2. Prepare the data object matching the Google Script keys
       const payload = {
-        // Personal Details
         fullName: data.name,
         schoolIdNumber: data.schoolId,
         collegeCourse: data.course,
         address: data.address,
         phoneNumber: data.phone,
         emailAddress: data.email,
-        
-        // Loan Details
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
         disbursementMethod: data.disbursementMethod,
         walletNumber: data.walletNumber,
-        
-        // Images (REMOVED - Sending empty strings to prevent errors in backend)
         schoolIdImage: "",
         schoolIdMime: "", 
         corImage: "",
         corMime: "",
-        
-        // Signature
-        signature: data.signature // Already base64 data URI
+        signature: data.signature
       };
 
-      // 3. Send the POST request
-      // We use Content-Type text/plain;charset=utf-8 to avoid Preflight OPTIONS request.
-      // redirect: "follow" handles the 302 redirect from Google Scripts correctly.
-      const response = await submitWithRetry(SCRIPT_URL, {
+      // Direct fetch with standard headers for Google Apps Script
+      const response = await fetch(SCRIPT_URL, {
         method: "POST",
         redirect: "follow", 
         headers: {
-          "Content-Type": "text/plain;charset=utf-8",
+          "Content-Type": "text/plain",
         },
         body: JSON.stringify(payload)
       });
 
-      // 4. Handle Response
-      // Read text first to debug if it returns HTML (common GAS error page) instead of JSON
       const text = await response.text();
-      
       let result;
       try {
         result = JSON.parse(text);
       } catch (e) {
-        console.error("Received non-JSON response:", text.substring(0, 500)); 
-        throw new Error("The server response was not in the expected format. Please try again.");
+        console.error("Non-JSON response:", text); 
+        throw new Error("Server response format error.");
       }
 
       if (result.result !== "success" && result.status !== "success") {
@@ -237,7 +205,6 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     e.preventDefault();
     if (isSubmitting) return;
 
-    // Validate step 2
     const stepErrors: Record<string, string> = {};
     if (!formData.loanAmount) stepErrors.loanAmount = 'Loan amount is required';
     if (!formData.loanPurpose) stepErrors.loanPurpose = 'Purpose is required';
@@ -262,11 +229,8 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     setIsSubmitting(true);
 
     try {
-      // 2. Call Google Sheet sync (Text Only)
       await submitLoanApplication(formData);
-      
       setIsSubmitted(true);
-      
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       alert(`Submission failed: ${errorMessage}. Please check your internet connection.`);
