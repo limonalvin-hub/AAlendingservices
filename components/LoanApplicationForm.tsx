@@ -5,153 +5,106 @@ import React, { useState, FormEvent, useRef } from 'react';
   GOOGLE APPS SCRIPT BACKEND CODE (COPY & PASTE TO GOOGLE SCRIPT)
   ===================================================================
 
-  // A&A Lending Services Backend
-  // Handles Form Submission, Admin Notifications, and Automated Student Emails.
+  // Google Apps Script for Allowance Aid Lending Services
+  // Handles POST requests, updates Google Sheets, and sends email notifications.
 
-  const ADMIN_EMAIL = "aalendingservices@gmail.com";
-
-  // 1. READ DATA (For Admin Dashboard - Optional)
-  function doGet(e) {
-    return handleCORS(function() {
-      var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-      var data = sheet.getDataRange().getValues();
-      var headers = data[0];
-      var jsonData = [];
-      
-      for (var i = 1; i < data.length; i++) {
-        var row = {};
-        for (var j = 0; j < headers.length; j++) {
-          row[headers[j]] = data[i][j];
-        }
-        jsonData.push(row);
-      }
-      return JSON.stringify({ status: "success", data: jsonData });
-    });
-  }
-
-  // 2. WRITE DATA (Receive Application)
   function doPost(e) {
-    return handleCORS(function() {
-      var lock = LockService.getScriptLock();
-      // Wait for up to 10 seconds for other processes to finish.
-      lock.tryLock(10000); 
+    var lock = LockService.getScriptLock();
+    lock.tryLock(10000); // Wait up to 10s for other processes
 
-      try {
-        var data = JSON.parse(e.postData.contents);
-        var ss = SpreadsheetApp.getActiveSpreadsheet();
-        var sheet = ss.getActiveSheet();
-
-        // Setup Headers if sheet is empty
-        if (sheet.getLastRow() === 0) {
-          var headers = [
-            "Timestamp", 
-            "Full Name", 
-            "School ID", 
-            "Course", 
-            "Address", 
-            "Phone Number", 
-            "Email Address", 
-            "Loan Amount", 
-            "Purpose", 
-            "Disbursement Method", 
-            "Wallet Number", 
-            "Status" // Column 12
-          ];
-          sheet.appendRow(headers);
-          sheet.setFrozenRows(1);
-        }
-
-        var timestamp = new Date();
-        
-        // Prepare Row Data
-        var newRow = [
-          timestamp,
-          data.fullName,
-          data.schoolIdNumber,
-          data.collegeCourse,
-          data.address,
-          data.phoneNumber,
-          data.emailAddress,
-          "'" + data.loanAmount, // Force string to prevent formatting issues
-          data.purposeOfLoan,
-          data.disbursementMethod,
-          "'" + data.walletNumber,
-          "Pending" // Default Status
-        ];
-
-        sheet.appendRow(newRow);
-
-        // --- SMART SHEET FEATURE: ADD DROPDOWN ---
-        var lastRow = sheet.getLastRow();
-        // Status is Column 12 based on the header list above
-        var statusCell = sheet.getRange(lastRow, 12); 
-        var rule = SpreadsheetApp.newDataValidation()
-          .requireValueInList(['Pending', 'Approved', 'Rejected'], true)
-          .setAllowInvalid(false)
-          .build();
-        statusCell.setDataValidation(rule);
-
-        // --- NOTIFICATION: EMAIL ADMIN ---
-        var subject = "New Loan Application: " + data.fullName;
-        var body = 
-          "A new application has been received.\n\n" +
-          "Name: " + data.fullName + "\n" +
-          "Amount: " + data.loanAmount + "\n" +
-          "Phone: " + data.phoneNumber + "\n\n" +
-          "Please check the Google Sheet to review.";
-        
-        MailApp.sendEmail(ADMIN_EMAIL, subject, body);
-
-        return JSON.stringify({ result: "success" });
-
-      } catch (error) {
-        return JSON.stringify({ result: "error", error: error.toString() });
-      } finally {
-        lock.releaseLock();
-      }
-    });
-  }
-
-  // 3. AUTOMATION: Email Student on Status Change
-  function onEdit(e) {
-    var range = e.range;
-    var sheet = range.getSheet();
-    var row = range.getRow();
-    var col = range.getColumn();
-    
-    // Basic checks: Not header row, must be "Status" column (Col 12)
-    if (row > 1 && col === 12) { 
-      var newStatus = e.value;
-      // Email is in Column 7
-      var emailCell = sheet.getRange(row, 7); 
-      var studentEmail = emailCell.getValue();
+    try {
+      // 1. PARSE INCOMING JSON DATA
+      var data = JSON.parse(e.postData.contents);
       
-      // Name is in Column 2
-      var nameCell = sheet.getRange(row, 2);
-      var studentName = nameCell.getValue();
-
-      if (newStatus === "Approved") {
-        MailApp.sendEmail({
-          to: studentEmail,
-          subject: "Loan Approved - Allowance Aid",
-          body: "Dear " + studentName + ",\n\nGreat news! Your loan application has been APPROVED.\n\nWe will process the disbursement shortly to your chosen method.\n\nThank you,\nAllowance Aid Lending Services"
-        });
-      } else if (newStatus === "Rejected") {
-        MailApp.sendEmail({
-          to: studentEmail,
-          subject: "Loan Application Update - Allowance Aid",
-          body: "Dear " + studentName + ",\n\nWe have reviewed your application. Unfortunately, we cannot approve your loan at this time.\n\nThank you,\nAllowance Aid Lending Services"
-        });
+      // 2. SETUP SPREADSHEET
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheetName = "Applications";
+      var sheet = ss.getSheetByName(sheetName);
+      
+      // Create "Applications" sheet if it doesn't exist
+      if (!sheet) {
+        sheet = ss.insertSheet(sheetName);
+        var headers = [
+          "Timestamp", 
+          "Full Name", 
+          "Contact Number", 
+          "Email Address", 
+          "Loan Amount", 
+          "Purpose of Loan", 
+          "Payment Terms", 
+          "Status",          // Crucial: Defaults to Pending
+          "School ID", 
+          "Course", 
+          "Address", 
+          "Disbursement Method", 
+          "Wallet Number"
+        ];
+        sheet.appendRow(headers);
+        sheet.setFrozenRows(1);
       }
+
+      var timestamp = new Date();
+      
+      // 3. PREPARE ROW DATA
+      // We prepend "'" to numbers (like phone/wallet) to ensure they are treated as text in Sheets
+      var rowData = [
+        timestamp,
+        data.fullName,
+        "'" + data.contactNumber,
+        data.emailAddress,
+        data.loanAmount,
+        data.purposeOfLoan,
+        data.paymentTerms,
+        "Pending", // Default Status
+        data.schoolId,
+        data.course,
+        data.address,
+        data.disbursementMethod,
+        "'" + data.walletNumber
+      ];
+
+      // 4. APPEND ROW
+      sheet.appendRow(rowData);
+
+      // 5. SEND EMAIL NOTIFICATION
+      var adminEmail = "aalendingservices@gmail.com";
+      var subject = "New Loan Application: " + data.fullName;
+      var htmlBody = 
+        "<h3>New Loan Application Received</h3>" +
+        "<p><strong>Name:</strong> " + data.fullName + "</p>" +
+        "<p><strong>Loan Amount:</strong> ₱" + data.loanAmount + "</p>" +
+        "<p><strong>Purpose:</strong> " + data.purposeOfLoan + "</p>" +
+        "<p><strong>Payment Terms:</strong> " + data.paymentTerms + "</p>" +
+        "<p><strong>Contact:</strong> " + data.contactNumber + "</p>" +
+        "<p><strong>Email:</strong> " + data.emailAddress + "</p>" +
+        "<hr/>" +
+        "<p><strong>School ID:</strong> " + data.schoolId + "</p>" +
+        "<p><strong>Course:</strong> " + data.course + "</p>" +
+        "<p><strong>Address:</strong> " + data.address + "</p>" +
+        "<p><strong>Disbursement:</strong> " + data.disbursementMethod + " (" + data.walletNumber + ")</p>" +
+        "<br/>" +
+        "<p><a href='" + ss.getUrl() + "' style='background-color: #1a648a; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;'>Open Google Sheet</a></p>";
+      
+      MailApp.sendEmail({
+        to: adminEmail,
+        subject: subject,
+        htmlBody: htmlBody
+      });
+
+      // 6. RETURN SUCCESS JSON
+      // We use ContentService to return JSON.
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "Application submitted successfully." }))
+        .setMimeType(ContentService.MimeType.JSON);
+
+    } catch (error) {
+      // RETURN ERROR JSON
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.toString() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    } finally {
+      lock.releaseLock();
     }
   }
-
-  // --- HELPER: CORS Handler ---
-  function handleCORS(callback) {
-    var result = callback();
-    return ContentService.createTextOutput(result).setMimeType(ContentService.MimeType.JSON);
-  }
-
+  
   ===================================================================
   END OF BACKEND CODE
   ===================================================================
@@ -309,28 +262,44 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
 
   // 1. Submit to Google Sheets (Backend Record)
   const submitLoanApplication = async (data: typeof formData) => {
-    // UPDATED SCRIPT URL
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNnHIioqUO9PQnHM-oi5FdYXyDbiMq19-o_i_7hD9zby4dWQOlv6FE6-F_BiroBsaqCA/exec";
+    // Replace this with your DEPLOYED Web App URL
+    // Ensure "Anyone" can access the web app when deploying in Google Apps Script
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYKvuw6BaH0IUBO0keoSZkM2tijwotZM3K0zIb0bmfu408mej-xZVefvj6DqteZ18fRQ/exec";
     
     try {
+      // Calculate Payment Terms based on Amount (Business Logic)
+      let calculatedTerms = "1 month tenure";
+      const amountVal = parseFloat(data.loanAmount);
+      if (!isNaN(amountVal)) {
+        if (amountVal <= 200) calculatedTerms = "1 week tenure";
+        else if (amountVal <= 500) calculatedTerms = "2 weeks tenure";
+      }
+
+      // Payload matching the Google Script requirements
+      // Keys match the JSON.parse in GAS doPost(e)
       const payload = {
         fullName: data.name,
-        schoolIdNumber: data.schoolId,
-        collegeCourse: data.course,
-        address: data.address,
-        phoneNumber: data.phone,
+        contactNumber: data.phone,
         emailAddress: data.email,
         loanAmount: data.loanAmount,
         purposeOfLoan: data.loanPurpose,
+        paymentTerms: calculatedTerms,
+        // Additional fields
+        schoolId: data.schoolId,
+        course: data.course,
+        address: data.address,
         disbursementMethod: data.disbursementMethod,
-        walletNumber: data.walletNumber
+        walletNumber: data.walletNumber || "N/A"
       };
 
       await fetch(SCRIPT_URL, {
         method: "POST",
+        // Using 'no-cors' ensures the request doesn't fail due to CORS preflight checks.
+        // Google Apps Script doesn't handle OPTIONS preflight requests for JSON content-type.
+        // We send as text/plain so it treats it as a simple request, bypassing preflight.
         mode: "no-cors", 
         headers: {
-          "Content-Type": "text/plain",
+          "Content-Type": "text/plain", 
         },
         body: JSON.stringify(payload)
       });
@@ -338,13 +307,21 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
       return true;
     } catch (error) {
       console.error("Submission Error:", error);
-      // We continue even if sheet fails, so the user can still email
+      // We return false, but in this app flow we often proceed to email fallback
       return false;
     }
   };
 
   // 2. Open Email Client (User Manual Send)
   const handleEmailComposition = (data: typeof formData) => {
+    // Calculate Terms for Email too
+    let calculatedTerms = "1 month tenure";
+    const amountVal = parseFloat(data.loanAmount);
+    if (!isNaN(amountVal)) {
+      if (amountVal <= 200) calculatedTerms = "1 week tenure";
+      else if (amountVal <= 500) calculatedTerms = "2 weeks tenure";
+    }
+
     const subject = encodeURIComponent(`Loan Application - ${data.name}`);
     const body = encodeURIComponent(`
 Dear A&A Lending Services,
@@ -362,6 +339,7 @@ Email: ${data.email}
 --- LOAN REQUEST ---
 Amount: ₱${data.loanAmount}
 Purpose: ${data.loanPurpose}
+Payment Terms: ${calculatedTerms}
 Disbursement Method: ${data.disbursementMethod}
 ${data.disbursementMethod !== 'in_person' ? `Wallet Number: ${data.walletNumber}` : ''}
 
