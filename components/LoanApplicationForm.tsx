@@ -66,7 +66,7 @@ import React, { useState, FormEvent, useRef } from 'react';
       // 4. APPEND ROW
       sheet.appendRow(rowData);
 
-      // 5. SEND EMAIL NOTIFICATION
+      // 5. SEND EMAIL NOTIFICATION (To Admin)
       var adminEmail = "aalendingservices@gmail.com";
       var subject = "New Loan Application: " + data.fullName;
       var htmlBody = 
@@ -260,6 +260,16 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
   
   const prevStep = () => setStep(prev => prev - 1);
 
+  // Helper to calculate terms for UI consistency
+  const calculateTerms = (amount: string) => {
+    const amountVal = parseFloat(amount);
+    if (!isNaN(amountVal)) {
+      if (amountVal <= 200) return "1 week tenure";
+      else if (amountVal <= 500) return "2 weeks tenure";
+    }
+    return "1 month tenure";
+  };
+
   // 1. Submit to Google Sheets (Backend Record)
   const submitLoanApplication = async (data: typeof formData) => {
     // Replace this with your DEPLOYED Web App URL
@@ -267,13 +277,7 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzYKvuw6BaH0IUBO0keoSZkM2tijwotZM3K0zIb0bmfu408mej-xZVefvj6DqteZ18fRQ/exec";
     
     try {
-      // Calculate Payment Terms based on Amount (Business Logic)
-      let calculatedTerms = "1 month tenure";
-      const amountVal = parseFloat(data.loanAmount);
-      if (!isNaN(amountVal)) {
-        if (amountVal <= 200) calculatedTerms = "1 week tenure";
-        else if (amountVal <= 500) calculatedTerms = "2 weeks tenure";
-      }
+      const calculatedTerms = calculateTerms(data.loanAmount);
 
       // Payload matching the Google Script requirements
       // Keys match the JSON.parse in GAS doPost(e)
@@ -312,18 +316,12 @@ const LoanApplicationForm: React.FC<LoanApplicationFormProps> = ({ onBack }) => 
     }
   };
 
-  // 2. Open Email Client (User Manual Send)
+  // 2. Open Email Client (Standard Mailto)
   const handleEmailComposition = (data: typeof formData) => {
-    // Calculate Terms for Email too
-    let calculatedTerms = "1 month tenure";
-    const amountVal = parseFloat(data.loanAmount);
-    if (!isNaN(amountVal)) {
-      if (amountVal <= 200) calculatedTerms = "1 week tenure";
-      else if (amountVal <= 500) calculatedTerms = "2 weeks tenure";
-    }
+    const calculatedTerms = calculateTerms(data.loanAmount);
 
     const subject = encodeURIComponent(`Loan Application - ${data.name}`);
-    const body = encodeURIComponent(`
+    const bodyText = `
 Dear A&A Lending Services,
 
 I am submitting my loan application details.
@@ -348,10 +346,48 @@ I have attached my School ID and Certificate of Registration (COR) to this email
 
 Sincerely,
 ${data.name}
-    `);
+    `;
+    const body = encodeURIComponent(bodyText);
 
     // Force open the mail client
     window.location.href = `mailto:aalendingservices@gmail.com?subject=${subject}&body=${body}`;
+  };
+
+  // 3. Open Gmail Web (Desktop Fallback)
+  const handleGmailWebComposition = (data: typeof formData) => {
+    const calculatedTerms = calculateTerms(data.loanAmount);
+    const subject = encodeURIComponent(`Loan Application - ${data.name}`);
+    const bodyText = `
+Dear A&A Lending Services,
+
+I am submitting my loan application details.
+
+--- APPLICANT DETAILS ---
+Name: ${data.name}
+School ID: ${data.schoolId}
+Course: ${data.course}
+Address: ${data.address}
+Phone: ${data.phone}
+Email: ${data.email}
+
+--- LOAN REQUEST ---
+Amount: ₱${data.loanAmount}
+Purpose: ${data.loanPurpose}
+Payment Terms: ${calculatedTerms}
+Disbursement Method: ${data.disbursementMethod}
+${data.disbursementMethod !== 'in_person' ? `Wallet Number: ${data.walletNumber}` : ''}
+
+--- REQUIREMENTS ---
+I have attached my School ID and Certificate of Registration (COR) to this email.
+
+Sincerely,
+${data.name}
+    `;
+    const body = encodeURIComponent(bodyText);
+
+    // Open Gmail Compose Window
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=aalendingservices@gmail.com&su=${subject}&body=${body}`;
+    window.open(gmailUrl, '_blank');
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -385,13 +421,14 @@ ${data.name}
       // Step A: Send to Google Sheet (Behind the scenes)
       await submitLoanApplication(formData);
       
-      // Step B: Open Email for User to Attach Files
-      handleEmailComposition(formData);
+      // We intentionally do NOT auto-redirect to mailto here because browsers block
+      // redirects that occur after an async await (timeout).
+      // Instead, we show the success screen with a prominent button.
 
       setIsSubmitted(true);
     } catch (err) {
-      // Fallback: Just open email if sheet fails
-      handleEmailComposition(formData);
+      console.error("Submission failed", err);
+      // Fallback: Proceed to success screen anyway so they can email manually
       setIsSubmitted(true);
     } finally {
       setIsSubmitting(false);
@@ -429,20 +466,40 @@ ${data.name}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Recorded!</h3>
-              <p className="text-gray-600 mb-6">Your details have been saved to our system.</p>
+              <h3 className="text-2xl font-bold text-brand-blue-dark mb-2">Application Data Saved!</h3>
+              <p className="text-gray-600 mb-6">Your details have been recorded in our system.</p>
               
-              <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-6 rounded-md mb-8 text-left" role="alert">
-                  <p className="font-bold mb-2 text-lg">📧 ONE FINAL STEP:</p>
-                  <p className="mb-4">Your email app should have opened automatically. Please <strong>attach your School ID and COR</strong> to that email and hit <strong>Send</strong>.</p>
+              <div className="bg-blue-50 border-l-4 border-blue-400 text-blue-800 p-6 rounded-md mb-8 text-left shadow-sm" role="alert">
+                  <p className="font-bold mb-3 text-lg flex items-center gap-2">
+                    <span>📧</span> IMPORTANT: FINAL STEP
+                  </p>
+                  <p className="mb-4">
+                    To complete your application, you must <strong>email us your School ID and COR</strong>.
+                  </p>
                   
-                  <p className="text-sm mb-2">If your email app didn't open, click the button below:</p>
-                  <button 
-                    onClick={() => handleEmailComposition(formData)}
-                    className="bg-brand-blue text-white px-4 py-2 rounded-md font-bold hover:bg-brand-blue-dark transition"
-                  >
-                    Open Email & Attach Files
-                  </button>
+                  <div className="flex flex-col gap-3">
+                    <button 
+                      onClick={() => handleEmailComposition(formData)}
+                      className="bg-brand-blue text-white w-full py-3 rounded-md font-bold hover:bg-brand-blue-dark transition shadow-md flex items-center justify-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      Open Email App to Attach ID & COR
+                    </button>
+
+                    <div className="text-center text-sm text-gray-500 my-1">- OR -</div>
+
+                    <button 
+                      onClick={() => handleGmailWebComposition(formData)}
+                      className="bg-white border border-gray-300 text-gray-700 w-full py-2 rounded-md font-semibold hover:bg-gray-50 transition text-sm flex items-center justify-center gap-2"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor">
+                         <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" fill="#EA4335"></path>
+                      </svg>
+                      Open in Gmail Website
+                    </button>
+                  </div>
               </div>
 
               <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8 border-t pt-6">
